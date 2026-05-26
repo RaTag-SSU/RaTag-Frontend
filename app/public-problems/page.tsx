@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Navbar } from "@/components/navbar"
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -45,12 +45,11 @@ export default function PublicProblemsPage() {
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState("ROLE_USER")
   
-  // 페이징 및 배열/태그 토글 상태 관리
   const [page, setPage] = useState(0)
   const pageSize = 100
   const [isLastPage, setIsLastPage] = useState(false)
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list") // 🚀 1열(list) / 3열(grid) 토글 상태
-  const [expandedTags, setExpandedTags] = useState<Record<number, boolean>>({}) // 🚀 카드별 태그 토글 상태
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list")
+  const [expandedTags, setExpandedTags] = useState<Record<number, boolean>>({})
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [mode, setMode] = useState<"CREATE" | "UPDATE">("CREATE")
@@ -116,7 +115,6 @@ export default function PublicProblemsPage() {
     loadProblems(nextPage, true)
   }
 
-  // 개별 태그 보기/숨기기 토글 함수
   const toggleTagVisibility = (id: number) => {
     setExpandedTags(prev => ({
       ...prev,
@@ -227,7 +225,6 @@ export default function PublicProblemsPage() {
       <Navbar />
 
       <main className="container mx-auto px-4 py-8">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -240,7 +237,6 @@ export default function PublicProblemsPage() {
           </div>
           
           <div className="flex items-center gap-3 self-end sm:self-auto">
-            {/* 🚀 1열 / 3열 레이아웃 배치 전환 토글 버튼 */}
             <div className="flex items-center border rounded-lg p-0.5 bg-muted/50">
               <Button
                 variant={viewMode === "list" ? "secondary" : "ghost"}
@@ -416,7 +412,6 @@ export default function PublicProblemsPage() {
           </div>
         </div>
 
-        {/* Problem List */}
         {loading && page === 0 ? (
           <div className={`grid gap-4 ${viewMode === "grid" ? "md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
             {[1, 2, 3, 4].map((i) => (
@@ -435,7 +430,6 @@ export default function PublicProblemsPage() {
           </Card>
         ) : (
           <>
-            {/* 🚀 viewMode 값에 따라 한 줄에 1개(list) 또는 3개(grid) 유연하게 조절 */}
             <div className={`grid gap-4 ${viewMode === "grid" ? "md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
               {problems.map((problem) => {
                 const isTagsExpanded = !!expandedTags[problem.id];
@@ -452,53 +446,66 @@ export default function PublicProblemsPage() {
                             {problem.id}번
                           </Badge>
                           
-                          {/* 🚀 1. 제목 클릭 시 풀이창 이동 하이퍼링크 처리 */}
                           <Link href={`/solve/${problem.id}`} className="text-base font-bold text-foreground hover:text-primary transition-colors cursor-pointer line-clamp-1">
                             {problem.title}
                           </Link>
 
-                          {/* 🚀 3. 주관식/객관식 뱃지 오류 수정 및 제목 바로 우측 배치 */}
+                          {/* 🚀 객관식 인식 오류 대문자 변환으로 완벽 해결 */}
                           <Badge variant="outline" className="text-xs font-semibold text-primary/80 border-primary/20 px-2 py-0">
-                            {problem.type === "MULTIPLE_CHOICE" ? "객관식" : "주관식"}
+                            {String(problem.type).toUpperCase() === "MULTIPLE_CHOICE" ? "객관식" : "주관식"}
                           </Badge>
                         </div>
                         
-                        {/* 성공/실패 여부 상단 우측 고정 */}
                         <div className="shrink-0">
                           {problem.userStatus === '성공' && <Badge className="bg-emerald-500 hover:bg-emerald-600">성공</Badge>}
                           {problem.userStatus === '실패' && <Badge variant="destructive">실패</Badge>}
                         </div>
                       </div>
-
-                      {/* 🚀 4. 기존 경로(sourcePath) 배지 노출 완전 삭제 */}
                     </CardHeader>
                     
-                    <CardContent className="flex-1 pb-3">
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                    <CardContent className="flex-1 flex flex-col pb-4">
+                      <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                         {problem.content}
                       </p>
 
-                      {/* 🚀 2. 태그 숨김 기능 및 토글 인터페이스 완벽 복구 */}
-                      <div className="space-y-2">
-                        <button
-                          onClick={() => toggleTagVisibility(problem.id)}
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-bold p-0 border-none bg-transparent cursor-pointer transition-colors"
-                        >
-                          {isTagsExpanded ? (
-                            <>
-                              <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-                              <span>태그 숨기기</span>
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                              <span>태그 보기</span>
-                            </>
-                          )}
-                        </button>
+                      {/* 🚀 CardFooter를 삭제하고 내부 레이아웃으로 병합하여 한 줄(같은 높이)에 배치 */}
+                      <div className="mt-auto pt-3 border-t border-border/40">
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => toggleTagVisibility(problem.id)}
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-bold p-0 border-none bg-transparent cursor-pointer transition-colors"
+                          >
+                            {isTagsExpanded ? (
+                              <><ChevronUp className="w-3.5 h-3.5 text-slate-400" /><span>태그 숨기기</span></>
+                            ) : (
+                              <><ChevronDown className="w-3.5 h-3.5 text-slate-400" /><span>태그 보기</span></>
+                            )}
+                          </button>
+
+                          <div className="flex items-center gap-3">
+                            {problem.avgDifficulty ? (
+                              <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                                정답률 {problem.avgDifficulty}%
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground">통계 없음</span>
+                            )}
+
+                            {isAdmin && (
+                              <div className="flex gap-0.5">
+                                <Button variant="ghost" size="icon" onClick={() => openUpdateForm(problem)} className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleDelete(problem.id)} className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
                         {isTagsExpanded && (
-                          <div className="pt-1.5 border-t border-dashed border-border/60">
+                          <div className="pt-2 mt-2 border-t border-dashed border-border/60">
                             {problem.topTags && problem.topTags.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {problem.topTags.map(tag => (
@@ -514,37 +521,11 @@ export default function PublicProblemsPage() {
                         )}
                       </div>
                     </CardContent>
-
-                    <CardFooter className="pt-0 flex items-center justify-between border-t border-border/40 bg-muted/10 px-6 py-2.5 mt-2">
-                      {/* 평균 정답률 통계 매칭 */}
-                      <div>
-                        {problem.avgDifficulty ? (
-                          <div className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                            평균 정답률 {problem.avgDifficulty}%
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">데이터 없음</span>
-                        )}
-                      </div>
-
-                      {/* 어드민 전용 제어 및 관리 도구 */}
-                      {isAdmin && (
-                        <div className="flex gap-0.5">
-                          <Button variant="ghost" size="icon" onClick={() => openUpdateForm(problem)} className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(problem.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      )}
-                    </CardFooter>
                   </Card>
                 )
               })}
             </div>
             
-            {/* 페이징 무한 스크롤 더보기 액션 */}
             {!isLastPage && (
               <div className="mt-8 flex justify-center">
                 <Button variant="outline" onClick={handleLoadMore} className="w-full max-w-sm py-5 font-bold shadow-sm">
