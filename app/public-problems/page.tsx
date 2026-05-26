@@ -52,7 +52,11 @@ export default function PublicProblemsPage() {
   })
 
   useEffect(() => {
-    fetch("/api/users/me")
+    fetch("/api/users/me", {
+      headers: {
+        "ngrok-skip-browser-warning": "69420",
+      },
+    })
       .then((res) => (res.ok ? res.json() : { role: "ROLE_USER" }))
       .then((user) => {
         setUserRole(user.role)
@@ -62,7 +66,11 @@ export default function PublicProblemsPage() {
   }, [])
 
   const loadProblems = () => {
-    fetch("/api/problems")
+    fetch("/api/problems", {
+      headers: {
+        "ngrok-skip-browser-warning": "69420",
+      },
+    })
       .then((res) => res.json())
       .then((data) => {
         setProblems(data)
@@ -110,7 +118,10 @@ export default function PublicProblemsPage() {
 
     const res = await fetch(url, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "69420",
+      },
       body: JSON.stringify(payload),
     })
 
@@ -126,7 +137,12 @@ export default function PublicProblemsPage() {
 
   const handleDelete = async (id: number) => {
     if (!confirm("정말 삭제하시겠습니까?")) return
-    const res = await fetch(`/api/problems/${id}`, { method: "DELETE" })
+    const res = await fetch(`/api/problems/${id}`, { 
+      method: "DELETE",
+      headers: {
+        "ngrok-skip-browser-warning": "69420",
+      },
+    })
     if (res.ok) {
       alert("삭제되었습니다.")
       loadProblems()
