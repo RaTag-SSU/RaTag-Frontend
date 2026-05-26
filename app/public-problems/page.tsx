@@ -105,7 +105,7 @@ export default function PublicProblemsPage() {
       }
     } catch (err) {
       console.error("목록 로드 에러:", err)
-    } finaly {
+    } finally {
       setLoading(false)
     }
   }
