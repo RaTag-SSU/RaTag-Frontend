@@ -57,6 +57,13 @@ export default function TagsPage() {
     setFilteredTags(filtered)
   }
 
+  // 🚀 태그 설명의 불필요한 큰따옴표(")를 제거하는 헬퍼 함수 추가
+  const cleanDescription = (desc?: string) => {
+    if (!desc) return "상세 설명이 없습니다."
+    // 시작과 끝에 있는 따옴표 제거, 혹은 전체 문자열의 모든 따옴표 제거
+    return desc.replace(/^"|"$/g, '').trim()
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -73,12 +80,6 @@ export default function TagsPage() {
               RaTag에 등록된 모든 문제 분류 태그와 상세 설명을 확인하세요.
             </p>
           </div>
-          <Link href="/">
-            <Button variant="outline" className="gap-2">
-              <Home className="h-4 w-4" />
-              홈으로
-            </Button>
-          </Link>
         </div>
 
         {/* Filter Bar */}
@@ -126,7 +127,8 @@ export default function TagsPage() {
                     {tag.name}
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {tag.description || "상세 설명이 없습니다."}
+                    {/* 🚀 클린 함수 적용 */}
+                    {cleanDescription(tag.description)}
                   </p>
                 </CardContent>
               </Card>
