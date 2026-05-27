@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Navbar } from "@/components/navbar"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search, Home, ChevronDown, ChevronUp, Target, X } from "lucide-react"
+import { Search, Home, ChevronDown, ChevronUp, X, LayoutList, LayoutGrid } from "lucide-react"
 
 interface Tag {
   id: number
@@ -29,12 +29,18 @@ interface Group {
   role: string
 }
 
+// 🚀 공개 문제와 동일하게 Problem 인터페이스 확장
 interface Problem {
   id: number
   title: string
-  avgDifficulty?: number
-  topTags?: string[]
+  content: string
+  sourcePath: string
+  type: "SHORT_ANSWER" | "MULTIPLE_CHOICE"
+  choices: string | null
+  answer: string
   userStatus?: string
+  topTags?: string[]
+  avgDifficulty?: number | null
 }
 
 export default function SearchPage() {
@@ -50,9 +56,12 @@ export default function SearchPage() {
   const [results, setResults] = useState<Problem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  
+  // 페이징 및 UI 상태 관리
   const [currentPage, setCurrentPage] = useState(0)
   const [isLastPage, setIsLastPage] = useState(false)
   const [expandedTags, setExpandedTags] = useState<Set<number>>(new Set())
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list") // 🚀 1열/3열 뷰 모드 추가
   const pageSize = 100
 
   useEffect(() => {
@@ -170,19 +179,13 @@ export default function SearchPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className="container mx-auto px-4 py-8 max-w-5xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-foreground mb-2">문제 탐색 및 검색</h1>
             <p className="text-sm text-muted-foreground">원하는 필터 조건들을 조합하여 문제를 검색해보세요.</p>
           </div>
-          <Link href="/">
-            <Button variant="outline" className="gap-2">
-              <Home className="h-4 w-4" />
-              홈으로
-            </Button>
-          </Link>
         </div>
 
         {/* Filter Box */}
@@ -310,11 +313,11 @@ export default function SearchPage() {
 
             {/* Buttons */}
             <div className="flex gap-3">
-              <Button onClick={() => performSearch(false)} className="flex-[4] gap-2">
-                <Search className="h-4 w-4" />
+              <Button onClick={() => performSearch(false)} className="flex-[4] gap-2 font-bold py-6">
+                <Search className="h-5 w-5" />
                 조건에 맞게 필터링하기
               </Button>
-              <Button variant="secondary" onClick={resetFilters} className="flex-1">
+              <Button variant="secondary" onClick={resetFilters} className="flex-1 font-bold">
                 초기화
               </Button>
             </div>
@@ -323,9 +326,33 @@ export default function SearchPage() {
 
         {/* Results */}
         <div>
-          <h2 className="text-lg font-bold text-foreground mb-4">
-            검색 결과 리스트 (<span className="text-primary">{results.length}</span>개)
-          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <h2 className="text-lg font-bold text-foreground">
+              검색 결과 리스트 (<span className="text-primary">{results.length}</span>개)
+            </h2>
+            
+            {/* 🚀 1열 / 3열 뷰 모드 토글 (공개 문제와 동일) */}
+            <div className="flex items-center border rounded-lg p-0.5 bg-muted/50 self-end sm:self-auto">
+              <Button
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 px-3"
+                onClick={() => setViewMode("list")}
+              >
+                <LayoutList className="h-4 w-4 mr-1.5" />
+                목록형 (1열)
+              </Button>
+              <Button
+                variant={viewMode === "grid" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 px-3"
+                onClick={() => setViewMode("grid")}
+              >
+                <LayoutGrid className="h-4 w-4 mr-1.5" />
+                바둑판형 (3열)
+              </Button>
+            </div>
+          </div>
 
           {isLoading && results.length === 0 ? (
             <Card className="bg-card border-border">
@@ -341,79 +368,101 @@ export default function SearchPage() {
             </Card>
           ) : (
             <div className="space-y-4">
-              {results.map((problem) => (
-                <Card key={problem.id} className="bg-card border-border hover:border-primary/50 transition-colors">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <Badge variant="outline" className="text-xs">
+              <div className={`grid gap-4 ${viewMode === "grid" ? "md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
+                {results.map((problem) => (
+                  <Card
+                    key={problem.id}
+                    className="bg-card border-border hover:border-primary/40 transition-all flex flex-col justify-between"
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="secondary" className="text-[10px] px-1.5 shrink-0 bg-secondary/60 font-bold">
                             {problem.id}번
                           </Badge>
-                          <Link
-                            href={`/solve/${problem.id}`}
-                            className="text-lg font-bold text-foreground hover:text-primary transition-colors flex items-center gap-2"
-                          >
+                          
+                          <Link href={`/solve/${problem.id}`} className="text-base font-bold text-foreground hover:text-primary transition-colors cursor-pointer line-clamp-1">
                             {problem.title}
-                            {problem.userStatus === "성공" && (
-                              <Badge className="bg-green-500/20 text-green-500 border-green-500/30">성공</Badge>
-                            )}
-                            {problem.userStatus === "실패" && (
-                              <Badge className="bg-red-500/20 text-red-500 border-red-500/30">실패</Badge>
-                            )}
                           </Link>
+
+                          {problem.type && (
+                            <Badge variant="outline" className="text-xs font-semibold text-primary/80 border-primary/20 px-2 py-0">
+                              {String(problem.type).toUpperCase() === "MULTIPLE_CHOICE" ? "객관식" : "주관식"}
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        <div className="shrink-0">
+                          {problem.userStatus === '성공' && <Badge className="bg-emerald-500 hover:bg-emerald-600">성공</Badge>}
+                          {problem.userStatus === '실패' && <Badge variant="destructive">실패</Badge>}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent className="flex-1 flex flex-col pb-4">
+                      {/* 검색 결과에서도 내용(content)을 보여주도록 추가 */}
+                      {problem.content && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                          {problem.content}
+                        </p>
+                      )}
+
+                      <div className="mt-auto pt-3 border-t border-border/40">
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => toggleTags(problem.id)}
+                            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-bold p-0 border-none bg-transparent cursor-pointer transition-colors"
+                          >
+                            {expandedTags.has(problem.id) ? (
+                              <><ChevronUp className="w-3.5 h-3.5 text-slate-400" /><span>태그 숨기기</span></>
+                            ) : (
+                              <><ChevronDown className="w-3.5 h-3.5 text-slate-400" /><span>태그 보기</span></>
+                            )}
+                          </button>
+
+                          <div className="flex items-center gap-3">
+                            {problem.avgDifficulty ? (
+                              <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                                정답률 {problem.avgDifficulty}%
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground">통계 없음</span>
+                            )}
+                          </div>
                         </div>
 
-                        {problem.topTags && problem.topTags.length > 0 && (
-                          <div className="mt-2">
-                            <button
-                              onClick={() => toggleTags(problem.id)}
-                              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              {expandedTags.has(problem.id) ? (
-                                <ChevronUp className="h-4 w-4" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4" />
-                              )}
-                              <span>{expandedTags.has(problem.id) ? "태그 숨기기" : "태그 보기"}</span>
-                            </button>
-                            {expandedTags.has(problem.id) && (
-                              <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-dashed border-border">
-                                {problem.topTags.map((tag) => (
-                                  <Badge key={tag} variant="secondary" className="text-xs">
+                        {expandedTags.has(problem.id) && (
+                          <div className="pt-2 mt-2 border-t border-dashed border-border/60">
+                            {problem.topTags && problem.topTags.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {problem.topTags.map(tag => (
+                                  <span key={tag} className="text-[11px] font-semibold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100">
                                     #{tag}
-                                  </Badge>
+                                  </span>
                                 ))}
                               </div>
+                            ) : (
+                              <p className="text-[12px] text-muted-foreground italic">등록된 태그가 없습니다.</p>
                             )}
                           </div>
                         )}
                       </div>
-
-                      <div className="text-right">
-                        {problem.avgDifficulty ? (
-                          <div className="flex items-center gap-2 bg-green-500/10 text-green-500 px-3 py-1.5 rounded-lg text-sm font-bold">
-                            <Target className="h-4 w-4" />
-                            평균 정답률 {problem.avgDifficulty}%
-                          </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">데이터 없음</span>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
 
               {!isLastPage && (
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => performSearch(true)}
-                  disabled={isLoading}
-                >
-                  {isLoading ? "로딩 중..." : "더보기"}
-                </Button>
+                <div className="mt-8 flex justify-center">
+                  <Button
+                    variant="outline"
+                    className="w-full max-w-sm py-5 font-bold shadow-sm"
+                    onClick={() => performSearch(true)}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "로딩 중..." : <><ChevronDown className="mr-1.5 h-4 w-4" /> 더보기</>}
+                  </Button>
+                </div>
               )}
             </div>
           )}
