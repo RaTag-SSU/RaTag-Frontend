@@ -34,9 +34,12 @@ import {
   Crown,
   UserCheck,
   UserX,
-  ExternalLink,
   LogOut,
   Clock,
+  ChevronDown,
+  ChevronUp,
+  LayoutList,
+  LayoutGrid
 } from "lucide-react"
 
 interface Group {
@@ -46,6 +49,7 @@ interface Group {
   role: "ADMIN" | "MEMBER" | "PENDING" | "NONE"
 }
 
+// 🚀 공개/검색 문제와 완벽히 통일된 Problem 인터페이스
 interface Problem {
   id: number
   title: string
@@ -53,6 +57,9 @@ interface Problem {
   type: "SHORT_ANSWER" | "MULTIPLE_CHOICE"
   choices: string | null
   answer: string
+  userStatus?: string
+  topTags?: string[]
+  avgDifficulty?: number | null
 }
 
 interface Member {
@@ -74,6 +81,11 @@ export default function GroupDetailPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [mode, setMode] = useState<"CREATE" | "UPDATE">("CREATE")
   const [editingProblem, setEditingProblem] = useState<Problem | null>(null)
+  
+  // 🚀 1열/3열 뷰 모드 및 태그 토글 상태 추가
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list")
+  const [expandedTags, setExpandedTags] = useState<Set<number>>(new Set())
+
   const [formData, setFormData] = useState({
     title: "",
     content: "",
@@ -113,16 +125,40 @@ export default function GroupDetailPage() {
       })
   }
 
-  const loadProblems = () => {
-    fetch(`/api/groups/${groupId}/problems`)
-      .then((res) => res.json())
-      .then((data) => setProblems(data))
+  // 🚀 통계 및 태그를 가져오기 위해 /api/problems/search API를 사용하도록 교체
+  const loadProblems = async () => {
+    try {
+      const res = await fetch("/api/problems/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          groupId: Number(groupId),
+          page: 0,
+          size: 100
+        })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setProblems(data)
+      }
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   const loadMembers = () => {
     fetch(`/api/groups/${groupId}/members`)
       .then((res) => res.json())
       .then((data) => setMembers(data))
+  }
+
+  const toggleTags = (id: number) => {
+    setExpandedTags((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   const openCreateForm = () => {
@@ -252,7 +288,7 @@ export default function GroupDetailPage() {
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 max-w-5xl">
         {/* Header */}
         <div className="mb-8">
           <Link
@@ -314,8 +350,8 @@ export default function GroupDetailPage() {
 
             {/* Problems Tab */}
             <TabsContent value="problems" className="mt-6">
-              {hasAdminAccess && (
-                <div className="mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                {hasAdminAccess ? (
                   <Button
                     onClick={openCreateForm}
                     className="bg-primary text-primary-foreground hover:bg-primary/90"
@@ -323,67 +359,128 @@ export default function GroupDetailPage() {
                     <Plus className="mr-2 h-4 w-4" />
                     새 문제 등록
                   </Button>
+                ) : (
+                  <div /> /* Flex spacing 유지용 */
+                )}
+
+                {/* 🚀 1열 / 3열 뷰 모드 토글 */}
+                <div className="flex items-center border rounded-lg p-0.5 bg-muted/50 self-end sm:self-auto">
+                  <Button
+                    variant={viewMode === "list" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8 px-3"
+                    onClick={() => setViewMode("list")}
+                  >
+                    <LayoutList className="h-4 w-4 mr-1.5" />
+                    목록형 (1열)
+                  </Button>
+                  <Button
+                    variant={viewMode === "grid" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8 px-3"
+                    onClick={() => setViewMode("grid")}
+                  >
+                    <LayoutGrid className="h-4 w-4 mr-1.5" />
+                    바둑판형 (3열)
+                  </Button>
                 </div>
-              )}
+              </div>
 
               {problems.length === 0 ? (
                 <Card className="bg-card border-border">
                   <CardContent className="flex flex-col items-center justify-center py-16">
                     <BookOpen className="h-16 w-16 text-muted-foreground mb-4" />
-                    <p className="text-lg font-medium text-foreground mb-2">문제가 없습니다</p>
-                    <p className="text-sm text-muted-foreground">새 문제를 등록해 주세요</p>
+                    <p className="text-lg font-medium text-foreground mb-2">그룹에 등록된 문제가 없습니다</p>
+                    {hasAdminAccess && <p className="text-sm text-muted-foreground">새 문제를 등록해 주세요</p>}
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className={`grid gap-4 ${viewMode === "grid" ? "md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
                   {problems.map((problem) => (
                     <Card
                       key={problem.id}
-                      className="bg-card border-border hover:border-primary/50 transition-all"
+                      className="bg-card border-border hover:border-primary/40 transition-all flex flex-col justify-between"
                     >
                       <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-base font-semibold line-clamp-1">
-                            {problem.title}
-                          </CardTitle>
-                          <Badge variant="outline" className="text-xs shrink-0">
-                            {problem.type === "MULTIPLE_CHOICE" ? "객관식" : "주관식"}
-                          </Badge>
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="secondary" className="text-[10px] px-1.5 shrink-0 bg-secondary/60 font-bold">
+                              {problem.id}번
+                            </Badge>
+                            
+                            <Link href={`/solve/${problem.id}`} className="text-base font-bold text-foreground hover:text-primary transition-colors cursor-pointer line-clamp-1">
+                              {problem.title}
+                            </Link>
+
+                            {problem.type && (
+                              <Badge variant="outline" className="text-xs font-semibold text-primary/80 border-primary/20 px-2 py-0">
+                                {String(problem.type).toUpperCase() === "MULTIPLE_CHOICE" ? "객관식" : "주관식"}
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <div className="shrink-0">
+                            {problem.userStatus === '성공' && <Badge className="bg-emerald-500 hover:bg-emerald-600">성공</Badge>}
+                            {problem.userStatus === '실패' && <Badge variant="destructive">실패</Badge>}
+                          </div>
                         </div>
                       </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                          {problem.content || "내용 없음"}
-                        </p>
-                        <div className="flex items-center justify-between">
-                          <Link href={`/solve/${problem.id}`}>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-border hover:bg-primary hover:text-primary-foreground"
+                      
+                      <CardContent className="flex-1 flex flex-col pb-4">
+                        {problem.content && (
+                          <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                            {problem.content}
+                          </p>
+                        )}
+
+                        <div className="mt-auto pt-3 border-t border-border/40">
+                          <div className="flex items-center justify-between">
+                            <button
+                              onClick={() => toggleTags(problem.id)}
+                              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-bold p-0 border-none bg-transparent cursor-pointer transition-colors"
                             >
-                              <ExternalLink className="mr-1 h-3 w-3" />
-                              풀이하기
-                            </Button>
-                          </Link>
-                          {hasAdminAccess && (
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openUpdateForm(problem.id)}
-                                className="text-muted-foreground hover:text-foreground"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => deleteProblem(problem.id)}
-                                className="text-muted-foreground hover:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {expandedTags.has(problem.id) ? (
+                                <><ChevronUp className="w-3.5 h-3.5 text-slate-400" /><span>태그 숨기기</span></>
+                              ) : (
+                                <><ChevronDown className="w-3.5 h-3.5 text-slate-400" /><span>태그 보기</span></>
+                              )}
+                            </button>
+
+                            <div className="flex items-center gap-3">
+                              {problem.avgDifficulty ? (
+                                <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                                  정답률 {problem.avgDifficulty}%
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-muted-foreground">통계 없음</span>
+                              )}
+
+                              {hasAdminAccess && (
+                                <div className="flex gap-0.5">
+                                  <Button variant="ghost" size="icon" onClick={() => openUpdateForm(problem.id)} className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" onClick={() => deleteProblem(problem.id)} className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {expandedTags.has(problem.id) && (
+                            <div className="pt-2 mt-2 border-t border-dashed border-border/60">
+                              {problem.topTags && problem.topTags.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {problem.topTags.map(tag => (
+                                    <span key={tag} className="text-[11px] font-semibold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100">
+                                      #{tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-[12px] text-muted-foreground italic">등록된 태그가 없습니다.</p>
+                              )}
                             </div>
                           )}
                         </div>
