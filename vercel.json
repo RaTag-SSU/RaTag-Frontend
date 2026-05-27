@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://innovations-fix-inputs-delays.trycloudflare.com//api/:path*"
+      "destination": "https://after-decor-warning-gained.trycloudflare.com/api/:path*"
     }
   ]
 }
