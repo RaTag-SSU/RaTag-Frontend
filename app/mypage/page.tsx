@@ -10,25 +10,22 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { 
   User, Lock, Save, TrendingUp, Target, AlertTriangle, 
-  Trophy, BookOpen, Calendar, Home, CheckCircle2, XCircle, Trash2 
+  Trophy, BookOpen, CheckCircle2, XCircle, Trash2 
 } from "lucide-react"
 import Link from "next/link"
 
 interface UserStats {
-  totalSolved: number
-  correctCount: number
-  wrongCount: number
-  accuracy: number
   weakTags: string[]
-}
-
-interface RecentActivity {
-  problemId: number
-  title: string
-  result: "SUCCESS" | "FAIL"
-  timestamp: string
 }
 
 interface UserProfile {
@@ -45,14 +42,15 @@ export default function MyPage() {
   const router = useRouter()
   const [user, setUser] = useState<UserProfile | null>(null)
   const [stats, setStats] = useState<UserStats | null>(null)
-  const [activities, setActivities] = useState<RecentActivity[]>([])
   
   // 프로필 수정 상태
   const [nickname, setNickname] = useState("")
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("") // 🚀 새 비밀번호 확인 상태 추가
   
   // 회원탈퇴 상태
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false)
   const [withdrawPassword, setWithdrawPassword] = useState("")
   const [withdrawConfirm, setWithdrawConfirm] = useState(false)
   
@@ -72,21 +70,13 @@ export default function MyPage() {
       }
       const userData = await res.json()
       setUser(userData)
-      // html에서는 nickname, 이전 tsx에서는 name을 사용했으므로 호환성 유지
       setNickname(userData.nickname || userData.name || "")
 
-      // 학습 통계 데이터 (유지)
+      // 학습 통계 데이터 (취약 태그용)
       const statsRes = await fetch("/api/users/stats")
       if (statsRes.ok) {
         const statsData = await statsRes.json()
         setStats(statsData)
-      }
-
-      // 최근 활동 데이터 (유지)
-      const activityRes = await fetch("/api/users/activities?limit=10")
-      if (activityRes.ok) {
-        const activityData = await activityRes.json()
-        setActivities(activityData)
       }
     } catch (e) {
       console.error(e)
@@ -95,10 +85,15 @@ export default function MyPage() {
     }
   }
 
-  // 🚀 html의 로직을 반영한 프로필 수정 (현재 비밀번호 필수)
   const handleSaveProfile = async () => {
     if (!currentPassword) {
       alert("정보를 수정하려면 현재 비밀번호를 입력해주세요.")
+      return
+    }
+
+    // 🚀 새 비밀번호와 확인용 비밀번호 일치 여부 검사
+    if (newPassword && newPassword !== newPasswordConfirm) {
+      alert("새 비밀번호가 일치하지 않습니다. 다시 확인해주세요.")
       return
     }
 
@@ -119,6 +114,7 @@ export default function MyPage() {
         alert("성공적으로 저장되었습니다.")
         setCurrentPassword("")
         setNewPassword("")
+        setNewPasswordConfirm("")
         fetchUserData()
       } else {
         const msg = await res.text()
@@ -130,7 +126,6 @@ export default function MyPage() {
     }
   }
 
-  // 🚀 html의 로직을 반영한 회원탈퇴
   const handleWithdraw = async () => {
     if (!withdrawPassword) {
       alert("탈퇴를 위해 현재 비밀번호를 입력해주세요.")
@@ -145,6 +140,7 @@ export default function MyPage() {
       })
       if (res.ok) {
         alert("회원 탈퇴가 완료되었습니다. 이용해 주셔서 감사합니다.")
+        setIsWithdrawOpen(false)
         router.push("/")
       } else {
         const msg = await res.text()
@@ -169,10 +165,11 @@ export default function MyPage() {
     )
   }
 
-  const accuracy = stats?.accuracy ?? 0
-  const totalSolved = stats?.totalSolved ?? 0
-  const correctCount = stats?.correctCount ?? 0
-  const wrongCount = stats?.wrongCount ?? 0
+  // 🚀 문제 리스트 기반으로 정확한 통계 직접 계산
+  const correctCount = user?.solvedProblemIds?.length || 0
+  const wrongCount = user?.wrongProblemIds?.length || 0
+  const totalSolved = correctCount + wrongCount
+  const accuracy = totalSolved > 0 ? (correctCount / totalSolved) * 100 : 0
   const weakTags = stats?.weakTags ?? []
 
   return (
@@ -191,29 +188,80 @@ export default function MyPage() {
               <p className="text-sm text-muted-foreground">계정 설정 및 학습 통계</p>
             </div>
           </div>
-          <Link href="/">
-            <Button variant="outline" className="gap-2">
-              <Home className="h-4 w-4" />
-              홈으로
-            </Button>
-          </Link>
+          
+          {/* 🚀 홈으로 버튼 대신 탈퇴 팝업(Dialog) 버튼으로 교체 */}
+          <Dialog open={isWithdrawOpen} onOpenChange={setIsWithdrawOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2 border-destructive/50 text-destructive hover:bg-destructive hover:text-white transition-colors">
+                <Trash2 className="h-4 w-4" />
+                회원탈퇴
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="text-destructive flex items-center gap-2">
+                  <Trash2 className="h-5 w-5" />
+                  계정 영구 삭제
+                </DialogTitle>
+                <DialogDescription>
+                  탈퇴 시 방장으로 있는 그룹은 먼저 삭제해야 합니다. 삭제된 데이터는 복구할 수 없습니다.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="withdrawPassword">비밀번호 확인</Label>
+                  <Input
+                    id="withdrawPassword"
+                    type="password"
+                    value={withdrawPassword}
+                    onChange={(e) => setWithdrawPassword(e.target.value)}
+                    placeholder="현재 비밀번호를 입력하세요"
+                    className="bg-input border-border focus:border-destructive"
+                  />
+                </div>
+                <div className="flex items-center space-x-2 bg-destructive/5 border border-destructive/20 p-3 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="withdraw-confirm"
+                    checked={withdrawConfirm}
+                    onChange={(e) => setWithdrawConfirm(e.target.checked)}
+                    className="w-4 h-4 rounded border-destructive/50 text-destructive accent-destructive cursor-pointer"
+                  />
+                  <Label
+                    htmlFor="withdraw-confirm"
+                    className="text-sm font-medium leading-none cursor-pointer text-destructive/90"
+                  >
+                    정말로 탈퇴하겠습니다. 이 작업은 되돌릴 수 없습니다.
+                  </Label>
+                </div>
+                <Button
+                  onClick={handleWithdraw}
+                  disabled={!withdrawConfirm}
+                  variant="destructive"
+                  className="w-full"
+                >
+                  회원탈퇴 진행
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* 🚀 좌측 컬럼: 계정 설정 및 회원탈퇴 */}
-          <div className="space-y-6">
-            {/* Profile Settings */}
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <User className="h-5 w-5 text-primary" />
-                  계정 정보 및 수정
-                </CardTitle>
-                <CardDescription>
-                  {user?.role === "ROLE_ADMIN" ? "관리자 계정입니다." : "일반 회원 계정입니다."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+        {/* 🚀 좌/우 카드 높이를 맞추기 위해 items-stretch 적용 */}
+        <div className="grid gap-6 lg:grid-cols-2 items-stretch mb-6">
+          {/* Profile Settings */}
+          <Card className="bg-card border-border flex flex-col h-full">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                계정 정보 및 수정
+              </CardTitle>
+              <CardDescription>
+                {user?.role === "ROLE_ADMIN" ? "관리자 계정입니다." : "일반 회원 계정입니다."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 flex-1 flex flex-col justify-between">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">이메일</Label>
                   <Input
@@ -223,7 +271,7 @@ export default function MyPage() {
                   />
                 </div>
                 
-                <Separator className="my-4" />
+                <Separator className="my-2" />
 
                 <div className="space-y-2">
                   <Label htmlFor="currentPassword">현재 비밀번호 <span className="text-destructive">*</span></Label>
@@ -257,241 +305,146 @@ export default function MyPage() {
                     className="bg-input border-border"
                   />
                 </div>
-                <Button
-                  onClick={handleSaveProfile}
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-2"
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  변경사항 저장
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Account Withdrawal */}
-            <Card className="bg-card border-destructive/20">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2 text-destructive">
-                  <Trash2 className="h-5 w-5" />
-                  계정 삭제
-                </CardTitle>
-                <CardDescription>
-                  탈퇴 시 방장으로 있는 그룹은 먼저 삭제해야 합니다. 삭제된 데이터는 복구할 수 없습니다.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+                {/* 🚀 새 비밀번호 확인 필드 추가 */}
                 <div className="space-y-2">
-                  <Label htmlFor="withdrawPassword">비밀번호 확인</Label>
+                  <Label htmlFor="newPasswordConfirm">새 비밀번호 확인</Label>
                   <Input
-                    id="withdrawPassword"
+                    id="newPasswordConfirm"
                     type="password"
-                    value={withdrawPassword}
-                    onChange={(e) => setWithdrawPassword(e.target.value)}
-                    placeholder="현재 비밀번호"
-                    className="bg-input border-destructive/20"
+                    value={newPasswordConfirm}
+                    onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                    placeholder="새 비밀번호를 다시 한 번 입력하세요"
+                    className="bg-input border-border"
                   />
                 </div>
-                
-                <div className="flex items-center space-x-2 bg-destructive/5 border border-destructive/20 p-3 rounded-lg mt-2">
-                  <input
-                    type="checkbox"
-                    id="withdraw-confirm"
-                    checked={withdrawConfirm}
-                    onChange={(e) => setWithdrawConfirm(e.target.checked)}
-                    className="w-4 h-4 rounded border-destructive/50 text-destructive accent-destructive cursor-pointer"
-                  />
-                  <Label
-                    htmlFor="withdraw-confirm"
-                    className="text-sm font-medium leading-none cursor-pointer text-destructive/90"
-                  >
-                    정말로 탈퇴하겠습니다. 이 작업은 되돌릴 수 없습니다.
-                  </Label>
+              </div>
+              
+              <Button
+                onClick={handleSaveProfile}
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-6"
+              >
+                <Save className="mr-2 h-4 w-4" />
+                변경사항 저장
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Stats Overview */}
+          <Card className="bg-card border-border flex flex-col h-full">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                학습 통계
+              </CardTitle>
+              <CardDescription>나의 학습 현황을 확인하세요</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 flex-1 flex flex-col justify-center">
+              {/* Accuracy */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <Target className="h-4 w-4 text-emerald-500" />
+                    정답률
+                  </span>
+                  <span className="text-2xl font-bold text-emerald-500">
+                    {accuracy.toFixed(1)}%
+                  </span>
                 </div>
+                <Progress value={accuracy} className="h-2 bg-emerald-100 [&>div]:bg-emerald-500" />
+              </div>
 
-                <Button
-                  onClick={handleWithdraw}
-                  disabled={!withdrawConfirm}
-                  variant="destructive"
-                  className="w-full mt-2"
-                >
-                  회원탈퇴 진행
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+              <Separator />
 
-          {/* 🚀 우측 컬럼: 학습 통계 및 문제 기록 */}
-          <div className="space-y-6">
-            {/* Stats Overview (유지) */}
-            <Card className="bg-card border-border h-fit">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  학습 통계
-                </CardTitle>
-                <CardDescription>나의 학습 현황을 확인하세요</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Accuracy */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-foreground flex items-center gap-2">
-                      <Target className="h-4 w-4 text-emerald-500" />
-                      정답률
-                    </span>
-                    <span className="text-2xl font-bold text-emerald-500">
-                      {accuracy.toFixed(1)}%
-                    </span>
-                  </div>
-                  <Progress value={accuracy} className="h-2 bg-emerald-100 [&>div]:bg-emerald-500" />
+              {/* Weak Tags */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <span className="text-sm font-medium text-foreground">취약 태그</span>
                 </div>
-
-                <Separator />
-
-                {/* Weak Tags */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    <span className="text-sm font-medium text-foreground">취약 태그</span>
+                {weakTags.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {weakTags.map((tag) => (
+                      <Badge key={tag} variant="outline" className="border-amber-500 text-amber-600 bg-amber-50">
+                        #{tag}
+                      </Badge>
+                    ))}
                   </div>
-                  {weakTags.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {weakTags.map((tag) => (
-                        <Badge key={tag} variant="outline" className="border-amber-500 text-amber-600 bg-amber-50">
-                          #{tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">분석 중이거나 취약 태그가 없습니다.</p>
-                  )}
+                ) : (
+                  <p className="text-sm text-muted-foreground">분석 중이거나 취약 태그가 없습니다.</p>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-3 gap-4 pt-2">
+                <div className="text-center p-3 rounded-lg bg-secondary/60">
+                  <BookOpen className="h-5 w-5 mx-auto mb-1 text-primary" />
+                  <p className="text-2xl font-bold text-foreground">{totalSolved}</p>
+                  <p className="text-xs text-muted-foreground mt-1">총 풀이</p>
                 </div>
-
-                <Separator />
-
-                {/* Quick Stats */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center p-3 rounded-lg bg-secondary/60">
-                    <BookOpen className="h-5 w-5 mx-auto mb-1 text-primary" />
-                    <p className="text-2xl font-bold text-foreground">{totalSolved}</p>
-                    <p className="text-xs text-muted-foreground mt-1">총 풀이</p>
-                  </div>
-                  <div className="text-center p-3 rounded-lg bg-emerald-50 border border-emerald-100">
-                    <Trophy className="h-5 w-5 mx-auto mb-1 text-emerald-500" />
-                    <p className="text-2xl font-bold text-emerald-600">{correctCount}</p>
-                    <p className="text-xs text-emerald-600/70 mt-1">성공</p>
-                  </div>
-                  <div className="text-center p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                    <AlertTriangle className="h-5 w-5 mx-auto mb-1 text-destructive" />
-                    <p className="text-2xl font-bold text-destructive">{wrongCount}</p>
-                    <p className="text-xs text-destructive/70 mt-1">실패</p>
-                  </div>
+                <div className="text-center p-3 rounded-lg bg-emerald-50 border border-emerald-100">
+                  <Trophy className="h-5 w-5 mx-auto mb-1 text-emerald-500" />
+                  <p className="text-2xl font-bold text-emerald-600">{correctCount}</p>
+                  <p className="text-xs text-emerald-600/70 mt-1">성공</p>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* 🚀 학습 기록 리스트 (html 요소 통합) */}
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
-                  전체 학습 기록
-                </CardTitle>
-                <CardDescription>지금까지 풀었던 문제 번호 모아보기</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="flex items-center gap-1.5 text-emerald-600 mb-2">
-                    <CheckCircle2 className="h-4 w-4" /> 맞은 문제
-                  </Label>
-                  <div className="p-3 bg-secondary/40 rounded-lg min-h-[60px] flex flex-wrap gap-2">
-                    {user?.solvedProblemIds && user.solvedProblemIds.length > 0 ? (
-                      user.solvedProblemIds.map(id => (
-                        <Link key={id} href={`/solve/${id}`}>
-                          <Badge variant="outline" className="cursor-pointer hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors">
-                            {id}번
-                          </Badge>
-                        </Link>
-                      ))
-                    ) : (
-                      <span className="text-sm text-muted-foreground m-auto">기록이 없습니다.</span>
-                    )}
-                  </div>
+                <div className="text-center p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <AlertTriangle className="h-5 w-5 mx-auto mb-1 text-destructive" />
+                  <p className="text-2xl font-bold text-destructive">{wrongCount}</p>
+                  <p className="text-xs text-destructive/70 mt-1">실패</p>
                 </div>
-                
-                <div>
-                  <Label className="flex items-center gap-1.5 text-destructive mb-2">
-                    <XCircle className="h-4 w-4" /> 틀린 문제
-                  </Label>
-                  <div className="p-3 bg-secondary/40 rounded-lg min-h-[60px] flex flex-wrap gap-2">
-                    {user?.wrongProblemIds && user.wrongProblemIds.length > 0 ? (
-                      user.wrongProblemIds.map(id => (
-                        <Link key={id} href={`/solve/${id}`}>
-                          <Badge variant="outline" className="cursor-pointer hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors">
-                            {id}번
-                          </Badge>
-                        </Link>
-                      ))
-                    ) : (
-                      <span className="text-sm text-muted-foreground m-auto">기록이 없습니다.</span>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Recent Activity (유지) */}
-        <Card className="mt-6 bg-card border-border">
+        {/* 🚀 전체 학습 기록을 좌우 2단 그리드 밖으로 빼내어 화면(가로) 전체를 꽉 채우도록 배치 */}
+        <Card className="bg-card border-border w-full">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              최근 활동 (최대 10개)
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              전체 학습 기록
             </CardTitle>
+            <CardDescription>지금까지 풀었던 문제 번호 모아보기</CardDescription>
           </CardHeader>
-          <CardContent>
-            {activities.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                아직 풀이 기록이 없습니다. 문제를 풀어보세요!
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {activities.map((activity, index) => (
-                  <Link key={index} href={`/solve/${activity.problemId}`}>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors cursor-pointer border border-transparent hover:border-border">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-2 h-2 rounded-full ${
-                            activity.result === "SUCCESS" ? "bg-emerald-500" : "bg-destructive"
-                          }`}
-                        />
-                        <div>
-                          <p className="text-sm font-bold text-foreground">
-                            <span className="text-muted-foreground mr-2 text-xs">[{activity.problemId}번]</span>
-                            {activity.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {new Date(activity.timestamp).toLocaleDateString("ko-KR", { 
-                              year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-                            })}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge
-                        variant={activity.result === "SUCCESS" ? "default" : "destructive"}
-                        className={
-                          activity.result === "SUCCESS"
-                            ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-200"
-                            : ""
-                        }
-                      >
-                        {activity.result === "SUCCESS" ? "성공" : "실패"}
+          <CardContent className="space-y-6">
+            <div>
+              <Label className="flex items-center gap-1.5 text-emerald-600 mb-3 text-sm font-bold">
+                <CheckCircle2 className="h-4 w-4" /> 맞은 문제
+              </Label>
+              <div className="p-4 bg-secondary/40 rounded-lg min-h-[60px] flex flex-wrap gap-2">
+                {user?.solvedProblemIds && user.solvedProblemIds.length > 0 ? (
+                  user.solvedProblemIds.map(id => (
+                    <Link key={id} href={`/solve/${id}`}>
+                      <Badge variant="outline" className="px-3 py-1 cursor-pointer hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors">
+                        {id}번
                       </Badge>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  ))
+                ) : (
+                  <span className="text-sm text-muted-foreground m-auto">기록이 없습니다.</span>
+                )}
               </div>
-            )}
+            </div>
+            
+            <div>
+              <Label className="flex items-center gap-1.5 text-destructive mb-3 text-sm font-bold">
+                <XCircle className="h-4 w-4" /> 틀린 문제
+              </Label>
+              <div className="p-4 bg-secondary/40 rounded-lg min-h-[60px] flex flex-wrap gap-2">
+                {user?.wrongProblemIds && user.wrongProblemIds.length > 0 ? (
+                  user.wrongProblemIds.map(id => (
+                    <Link key={id} href={`/solve/${id}`}>
+                      <Badge variant="outline" className="px-3 py-1 cursor-pointer hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors">
+                        {id}번
+                      </Badge>
+                    </Link>
+                  ))
+                ) : (
+                  <span className="text-sm text-muted-foreground m-auto">기록이 없습니다.</span>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </main>
