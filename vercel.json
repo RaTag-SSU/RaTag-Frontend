@@ -4,5 +4,13 @@
       "source": "/api/:path*",
       "destination": "https://after-decor-warning-gained.trycloudflare.com/api/:path*"
     }
+    {
+      "source": "/oauth2/:path*",
+      "destination": "https://after-decor-warning-gained.trycloudflare.com/oauth2/:path*"
+    },
+    {
+      "source": "/login/oauth2/:path*",
+      "destination": "https://after-decor-warning-gained.trycloudflare.com/login/oauth2/:path*"
+    }
   ]
 }
