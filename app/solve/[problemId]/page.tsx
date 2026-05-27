@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
-import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,22 +11,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  ArrowLeft,
-  BookOpen,
-  CheckCircle2,
-  XCircle,
-  Send,
-  ChevronRight,
-  FileText,
-  Image as ImageIcon,
-  Clock,
-  Target,
-  MessageSquare,
-  CalendarDays,
-  X,
-  Pencil,
-  Trash2,
-  ListOrdered
+  ArrowLeft, BookOpen, CheckCircle2, Send, FileText, Image as ImageIcon,
+  MessageSquare, X, Pencil, Trash2
 } from "lucide-react"
 
 interface Problem {
@@ -57,7 +42,7 @@ interface Review {
   updatedAt: string
 }
 
-const circleNumbers = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"]
+const circleNumbers = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"]
 
 export default function SolvePage() {
   const params = useParams()
@@ -66,29 +51,31 @@ export default function SolvePage() {
 
   const [problem, setProblem] = useState<Problem | null>(null)
   const [loading, setLoading] = useState(true)
-  const [userAnswer, setUserAnswer] = useState("")
-  const [isSubmitted, setIsSubmitted] = useState(false)
-  const [isCorrect, setIsCorrect] = useState(false)
-  const [failCount, setFailCount] = useState(0)
   
+  // 상태 및 풀이 기록
+  const [status, setStatus] = useState("풀이 전")
+  const [failCount, setFailCount] = useState(0)
+  const [userAnswer, setUserAnswer] = useState("")
+  const [shakeAnim, setShakeAnim] = useState(false)
+  const [feedbackMsg, setFeedbackMsg] = useState("")
+
+  // 레이아웃 리사이저
   const [leftPaneWidth, setLeftPaneWidth] = useState(60)
   const [isDragging, setIsDragging] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
-  // 🚀 Review & Evaluation State
+  // 평가 대시보드 상태
   const [summary, setSummary] = useState<ReviewSummary | null>(null)
   const [myReview, setMyReview] = useState<Review | null>(null)
   const [othersReviews, setOthersReviews] = useState<Review[]>([])
-  const [isEditingReview, setIsEditingReview] = useState(false)
+  const [isEditing, setIsEditing] = useState(false) // 보기 모드 / 수정 모드 토글
 
-  // Review Form State
+  // 폼 입력 상태
   const [reviewDiff, setReviewDiff] = useState(50)
   const [reviewMin, setReviewMin] = useState<number | "">("")
   const [reviewSec, setReviewSec] = useState<number | "">("")
   const [reviewComment, setReviewComment] = useState("")
   const [reviewTags, setReviewTags] = useState<string[]>([])
   
-  // Tag Autocomplete
   const [tagInput, setTagInput] = useState("")
   const [tagSuggestions, setTagSuggestions] = useState<{ id: number; name: string; description?: string }[]>([])
 
@@ -101,26 +88,20 @@ export default function SolvePage() {
 
     const initData = async () => {
       try {
-        const userRes = await fetch("/api/users/me")
-        const loggedIn = userRes.ok
-        setIsLoggedIn(loggedIn)
+        const [pRes, sRes] = await Promise.all([
+          fetch(`/api/problems/${problemId}`),
+          fetch(`/api/submissions/status/${problemId}`)
+        ])
 
-        const pRes = await fetch(`/api/problems/${problemId}`)
-        if (!pRes.ok) throw new Error("문제를 불러오지 못했습니다.")
-        const pData = await pRes.json()
-        setProblem(pData)
-
-        // 🚀 기존 풀이 상태 체크 (이미 맞힌 문제면 바로 평가 창 노출)
-        if (loggedIn) {
-          const sRes = await fetch(`/api/submissions/status/${problemId}`)
-          if (sRes.ok) {
-            const sData = await sRes.json()
-            setFailCount(sData.failCount || 0)
-            if (sData.status === "정답") {
-              setIsSubmitted(true)
-              setIsCorrect(true)
-              loadReviewDashboard()
-            }
+        if (pRes.ok) setProblem(await pRes.json())
+        
+        if (sRes.ok) {
+          const sData = await sRes.json()
+          setFailCount(sData.failCount || 0)
+          setStatus(sData.status || "풀이 전")
+          
+          if (sData.status === "정답") {
+            loadReviewDashboard()
           }
         }
       } catch (error) {
@@ -163,19 +144,11 @@ export default function SolvePage() {
     }
   }, [handleMouseMove, handleMouseUp])
 
-  // Answer Submission
+  // 정답 제출
   const submitAnswer = async () => {
-    if (!problem) return
     if (!userAnswer) {
-      alert(problem.type === "MULTIPLE_CHOICE" ? "정답을 선택해주세요!" : "정답을 입력해주세요!")
-      return
-    }
-
-    if (!isLoggedIn) {
-      // 비로그인 시 단순 로컬 채점
-      const correct = userAnswer === problem.answer
-      setIsCorrect(correct)
-      setIsSubmitted(true)
+      setFeedbackMsg("정답을 먼저 입력해주세요!")
+      triggerShake()
       return
     }
 
@@ -188,19 +161,27 @@ export default function SolvePage() {
       const result = await res.json()
       
       if (result.isCorrect) {
-        setIsCorrect(true)
-        setIsSubmitted(true)
+        setStatus("정답")
+        setFeedbackMsg("")
         loadReviewDashboard()
       } else {
-        setFailCount(prev => prev + 1)
-        alert(`❌ 틀렸습니다! (누적 오답: ${failCount + 1}회)`)
+        const newFailCount = failCount + 1
+        setFailCount(newFailCount)
+        setStatus("오답")
+        setFeedbackMsg(`❌ 틀렸습니다! (누적 오답: ${newFailCount}회)`)
+        triggerShake()
       }
     } catch (e) {
       console.error(e)
     }
   }
 
-  // 🚀 Review Dashboard Data Loading
+  const triggerShake = () => {
+    setShakeAnim(false)
+    setTimeout(() => setShakeAnim(true), 10)
+  }
+
+  // 리뷰 대시보드 로드
   const loadReviewDashboard = async () => {
     try {
       const sumRes = await fetch(`/api/problems/${problemId}/reviews/summary`)
@@ -210,28 +191,27 @@ export default function SolvePage() {
       if (meRes.ok && meRes.status !== 204) {
         const myData: Review = await meRes.json()
         setMyReview(myData)
-        setIsEditingReview(false)
+        setIsEditing(false) // 내 리뷰가 있으면 디스플레이 모드
         
-        // Populate form data
         setReviewDiff(myData.difficulty)
         setReviewMin(Math.floor(myData.timeTakenSeconds / 60))
         setReviewSec(myData.timeTakenSeconds % 60)
         setReviewComment(myData.comment)
         setReviewTags(myData.tags)
       } else {
-        setIsEditingReview(true) // 내 리뷰가 없으면 폼 열기
+        setIsEditing(true) // 없으면 입력 폼 모드
       }
 
       const othersRes = await fetch(`/api/problems/${problemId}/reviews`)
       if (othersRes.ok) setOthersReviews(await othersRes.json())
 
     } catch (e) {
-      console.error("리뷰 API 호출 오류", e)
+      console.error(e)
     }
   }
 
-  // Review Form Actions
-  const saveReview = async () => {
+  // 평가 저장
+  const saveEvaluation = async () => {
     const totalSeconds = (Number(reviewMin) || 0) * 60 + (Number(reviewSec) || 0)
     try {
       const res = await fetch("/api/submissions/review", {
@@ -247,7 +227,7 @@ export default function SolvePage() {
       })
       if (!res.ok) {
         const err = await res.text()
-        alert("평가 저장 실패: " + err)
+        alert("❌ 평가 저장 실패: " + err)
         return
       }
       loadReviewDashboard()
@@ -256,25 +236,19 @@ export default function SolvePage() {
     }
   }
 
-  const deleteReview = async () => {
+  // 평가 삭제
+  const deleteEvaluation = async () => {
     if (!confirm("정말 이 평가를 삭제하시겠습니까?")) return
     try {
       await fetch(`/api/submissions/review?problemId=${problemId}`, { method: "DELETE" })
       alert("삭제되었습니다.")
-      setMyReview(null)
-      setIsEditingReview(true)
-      setReviewDiff(50)
-      setReviewMin("")
-      setReviewSec("")
-      setReviewComment("")
-      setReviewTags([])
-      loadReviewDashboard()
+      window.location.reload()
     } catch (e) {
       console.error(e)
     }
   }
 
-  // Tag Management
+  // 태그 시스템
   const searchTags = async (query: string) => {
     setTagInput(query)
     if (!query.trim()) {
@@ -299,7 +273,7 @@ export default function SolvePage() {
     setReviewTags(reviewTags.filter(t => t !== name))
   }
 
-  // Helper Formatter
+  // 유틸 함수
   const getDiffText = (val: number) => {
     if (val < 20) return `${val}명 (매우 어려움)`
     if (val < 40) return `${val}명 (어려움)`
@@ -308,7 +282,7 @@ export default function SolvePage() {
     return `${val}명 (매우 쉬움)`
   }
   const formatTime = (secs: number) => `${Math.floor(secs / 60)}분 ${secs % 60}초`
-  const formatDate = (dateStr: string) => {
+  const formatDateTime = (dateStr: string) => {
     const d = new Date(dateStr)
     return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   }
@@ -331,31 +305,29 @@ export default function SolvePage() {
 
   return (
     <div className="h-screen bg-background flex overflow-hidden">
+      {/* Shake 애니메이션 CSS 주입 */}
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          20%, 60% { transform: translateX(-10px); }
+          40%, 80% { transform: translateX(10px); }
+        }
+        .shake-anim { animation: shake 0.4s ease-in-out; }
+      `}</style>
+
       {/* Left Pane - Problem Viewer */}
       <div className="bg-card border-r border-border flex flex-col overflow-hidden" style={{ width: `${leftPaneWidth}%` }}>
         {problem.pdfUrl ? (
           <iframe src={problem.pdfUrl} className="w-full h-full border-none" title="PDF Viewer" />
         ) : (
-          <div className="flex-1 overflow-y-auto p-8">
-            <div className="max-w-2xl mx-auto">
-              <div className="flex items-center gap-2 mb-6 text-muted-foreground">
-                <FileText className="h-4 w-4" />
-                <span className="text-sm font-bold">문제 내용</span>
-              </div>
-              <div className="prose prose-invert max-w-none">
-                <p className="text-lg leading-relaxed text-foreground whitespace-pre-wrap">
-                  {problem.content || "문제 내용이 없습니다."}
-                </p>
-              </div>
+          <div className="flex-1 overflow-y-auto p-12">
+            <div className="max-w-3xl mx-auto">
               {problem.imageUrl && (
-                <div className="mt-8">
-                  <div className="flex items-center gap-2 mb-4 text-muted-foreground">
-                    <ImageIcon className="h-4 w-4" />
-                    <span className="text-sm font-bold">첨부 이미지</span>
-                  </div>
-                  <img src={problem.imageUrl} alt="문제 첨부 이미지" className="rounded-lg border border-border max-w-full" />
-                </div>
+                <img src={problem.imageUrl} alt="문제 첨부 이미지" className="rounded-xl border border-border max-w-full mx-auto mb-8 shadow-sm" />
               )}
+              <div className="text-lg leading-relaxed text-foreground whitespace-pre-wrap bg-secondary/20 p-8 rounded-xl border border-border">
+                {problem.content || "문제 내용이 없습니다."}
+              </div>
             </div>
           </div>
         )}
@@ -363,37 +335,35 @@ export default function SolvePage() {
 
       {/* Resizer */}
       <div
-        className="w-2 bg-border hover:bg-primary cursor-col-resize flex items-center justify-center transition-colors"
+        className="w-2 bg-secondary hover:bg-primary cursor-col-resize flex items-center justify-center transition-colors z-10"
         onMouseDown={handleMouseDown}
       >
-        <div className="w-0.5 h-8 bg-muted-foreground/30 rounded-full" />
+        <div className="text-muted-foreground/50 font-bold select-none">⋮</div>
       </div>
 
       {/* Right Pane */}
-      <div className="flex-1 flex flex-col overflow-y-auto">
-        <div className="p-8 flex-1 max-w-3xl mx-auto w-full">
+      <div className="flex-1 flex flex-col overflow-y-auto bg-background">
+        <div className="p-10 flex-1 max-w-3xl mx-auto w-full">
           <button onClick={() => router.back()} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
-            <ArrowLeft className="mr-1 h-4 w-4" /> 이전 화면으로
+            <ArrowLeft className="mr-1 h-4 w-4" /> 이전 화면으로 돌아가기
           </button>
 
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-foreground mb-3">{problem.title}</h1>
-            <Badge variant="secondary" className="text-sm mb-4">{problem.sourcePath || "일반 문제"}</Badge>
-            <div className={`p-3 rounded-lg text-sm font-bold border flex items-center justify-between transition-colors ${isCorrect ? "bg-green-500/10 border-green-500/30 text-green-600" : failCount > 0 ? "bg-red-500/10 border-red-500/30 text-red-500" : "bg-secondary border-border text-foreground"}`}>
-              <span>현재 상태: {isCorrect ? "정답" : failCount > 0 ? "오답" : "풀이 전"}</span>
-              <span className="opacity-80">누적 시도: {failCount}회</span>
-            </div>
+          <h2 className="text-2xl font-extrabold text-foreground mb-2">{problem.title || "제목 없음"}</h2>
+          <Badge variant="secondary" className="text-xs mb-4 text-muted-foreground">{problem.sourcePath || "일반 문제"}</Badge>
+          
+          <div className={`p-3 rounded-lg text-sm font-bold border transition-colors mb-8 ${status === "정답" ? "bg-green-500/10 border-green-500/30 text-green-600" : status === "오답" ? "bg-red-500/10 border-red-500/30 text-red-500" : "bg-secondary border-border text-foreground"}`}>
+            현재 상태: {status} | 오답 시도: {failCount}회
           </div>
 
-          {!isSubmitted || !isCorrect ? (
-            // 📝 정답 제출 폼
-            <Card className="bg-card border-border shadow-sm">
-              <CardHeader className="border-b border-border/50 pb-4">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Send className="h-5 w-5 text-primary" /> 정답 입력
+          {/* 📝 정답 입력 영역 (정답이 아닐 때만 노출) */}
+          {status !== "정답" && (
+            <Card className={`bg-card border-border shadow-sm mb-6 transition-all ${shakeAnim ? "shake-anim bg-red-500/5 border-red-500/30" : ""}`}>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2 border-l-4 border-primary pl-3">
+                  정답 입력
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6 space-y-6">
+              <CardContent className="space-y-6">
                 {problem.type === "MULTIPLE_CHOICE" && choices.length > 0 ? (
                   <RadioGroup value={userAnswer} onValueChange={setUserAnswer}>
                     <div className="space-y-3">
@@ -401,152 +371,140 @@ export default function SolvePage() {
                         <Label
                           key={index}
                           htmlFor={`choice-${index}`}
-                          className="flex items-center gap-3 p-4 rounded-xl border border-border bg-secondary/20 cursor-pointer hover:bg-secondary/60 hover:border-primary/50 transition-all [&:has(:checked)]:border-primary [&:has(:checked)]:bg-primary/10"
+                          className="flex items-center gap-3 p-4 rounded-xl border border-border bg-background cursor-pointer hover:bg-secondary/60 hover:border-border transition-all [&:has(:checked)]:border-primary [&:has(:checked)]:bg-primary/10 [&:has(:checked)_span]:text-primary [&:has(:checked)_span]:font-bold"
                         >
-                          <RadioGroupItem value={String(index + 1)} id={`choice-${index}`} className="border-muted-foreground" />
-                          <span className="text-foreground">{circleNumbers[index] || `(${index + 1})`} {choice}</span>
+                          <RadioGroupItem value={String(index + 1)} id={`choice-${index}`} className="border-muted-foreground w-5 h-5" />
+                          <span className="text-foreground text-[15px]">{circleNumbers[index] || `(${index + 1})`} {choice}</span>
                         </Label>
                       ))}
                     </div>
                   </RadioGroup>
                 ) : (
-                  <div className="space-y-3">
-                    <Label htmlFor="answer" className="text-muted-foreground">답안 작성</Label>
-                    <Input
-                      id="answer"
-                      value={userAnswer}
-                      onChange={(e) => setUserAnswer(e.target.value)}
-                      placeholder="정답을 입력하세요"
-                      className="bg-input border-border text-lg py-6 px-4"
-                    />
+                  <Input
+                    value={userAnswer}
+                    onChange={(e) => setUserAnswer(e.target.value)}
+                    placeholder="정답을 입력하세요"
+                    className={`bg-background border-2 border-border text-base py-6 px-4 focus-visible:ring-0 focus-visible:border-primary transition-colors ${shakeAnim ? "border-red-500 bg-red-50" : ""}`}
+                  />
+                )}
+                
+                {feedbackMsg && (
+                  <div className="text-center text-sm font-bold text-destructive h-5">
+                    {feedbackMsg}
                   </div>
                 )}
-                <Button onClick={submitAnswer} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 py-6 font-bold text-base">
+                
+                <Button onClick={submitAnswer} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 hover:-translate-y-0.5 py-6 font-bold text-base transition-transform">
                   제출 및 채점하기
                 </Button>
               </CardContent>
             </Card>
-          ) : (
-            // 📊 학습 마무리 및 평가 대시보드
-            <div className="space-y-8 animate-in fade-in duration-500">
-              <div className="bg-green-500/10 border border-green-500/30 text-green-600 p-4 rounded-xl text-center font-bold flex items-center justify-center gap-2">
-                <CheckCircle2 className="h-5 w-5" />
-                ✅ 정답입니다! 문제에 대한 평가를 남겨주세요.
-              </div>
+          )}
 
-              {/* Summary Stats */}
-              <div>
-                <h3 className="text-lg font-bold flex items-center gap-2 mb-4">
-                  <Target className="h-5 w-5 text-primary" /> 종합 통계
-                </h3>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-secondary/40 border border-border rounded-xl p-4 text-center flex flex-col justify-center items-center h-24">
-                    <span className="text-xs font-bold text-muted-foreground mb-1">평균 예상 정답률</span>
-                    <span className="text-xl font-extrabold text-foreground">
-                      {summary?.avgDifficulty ? `${Math.round(summary.avgDifficulty)}%` : "정보 없음"}
+          {/* 📊 평가 및 종합 정보 영역 (정답일 때만 노출) */}
+          {status === "정답" && (
+            <Card className="bg-card border-border shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2 border-l-4 border-primary pl-3">
+                  학습 마무리 및 평가
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="bg-green-500/10 border border-green-500/30 text-green-600 p-5 rounded-xl text-center font-bold text-base">
+                  ✅ 정답입니다! 문제에 대한 정보를 남겨주세요.
+                </div>
+
+                {/* 문제 종합 데이터 */}
+                <div className="flex gap-4">
+                  <div className="flex-1 bg-secondary/40 border border-border rounded-xl p-4 text-center">
+                    <span className="text-xs font-bold text-muted-foreground block mb-1">평균 예상 정답률</span>
+                    <span className="text-lg font-extrabold text-foreground">
+                      {summary?.avgDifficulty ? `${Math.round(summary.avgDifficulty)}%` : "로딩중"}
                     </span>
                   </div>
-                  <div className="bg-secondary/40 border border-border rounded-xl p-4 text-center flex flex-col justify-center items-center h-24">
-                    <span className="text-xs font-bold text-muted-foreground mb-1">평균 소요 시간</span>
-                    <span className="text-xl font-extrabold text-foreground">
-                      {summary?.avgTimeSeconds ? formatTime(summary.avgTimeSeconds) : "정보 없음"}
+                  <div className="flex-1 bg-secondary/40 border border-border rounded-xl p-4 text-center">
+                    <span className="text-xs font-bold text-muted-foreground block mb-1">평균 소요 시간</span>
+                    <span className="text-lg font-extrabold text-foreground">
+                      {summary?.avgTimeSeconds ? formatTime(summary.avgTimeSeconds) : "로딩중"}
                     </span>
                   </div>
                 </div>
-                <div className="bg-secondary/40 border border-border rounded-xl p-4 flex items-center gap-4">
-                  <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">대표 태그</span>
+                
+                <div className="bg-secondary/40 border border-border rounded-xl p-4 flex items-start gap-4">
+                  <span className="text-xs font-bold text-muted-foreground mt-1.5 whitespace-nowrap">대표 태그</span>
                   <div className="flex flex-wrap gap-2 flex-1">
                     {summary?.topTags && summary.topTags.length > 0 ? (
-                      summary.topTags.map(t => (
-                        <Badge key={t} variant="secondary" className="bg-background border-border text-foreground shadow-sm">#{t}</Badge>
-                      ))
+                      summary.topTags.map(t => <Badge key={t} variant="secondary" className="bg-background">#{t}</Badge>)
                     ) : (
-                      <span className="text-sm text-muted-foreground">대표 태그가 없습니다.</span>
+                      <span className="text-sm text-muted-foreground">아직 대표 태그가 없습니다.</span>
                     )}
                   </div>
                 </div>
-              </div>
 
-              <Separator className="my-8" />
+                <Separator className="my-6" />
 
-              {/* My Review Section */}
-              <div className="bg-card border border-border rounded-xl p-6 shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-                <h3 className="text-lg font-bold flex items-center gap-2 mb-6">
-                  <Pencil className="h-5 w-5 text-primary" /> 나의 평가
-                </h3>
-
-                {!isEditingReview && myReview ? (
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-3">
-                        <Badge className="bg-primary/10 text-primary border-primary/20">내 의견</Badge>
-                        <span className="font-bold text-foreground">{myReview.writerName || "나"}</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">{formatDate(myReview.updatedAt)}</span>
+                {/* 내 평가 보기 모드 */}
+                {!isEditing && myReview && (
+                  <div className="mb-8">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Badge className="bg-primary text-white">내 의견</Badge>
+                      <span className="font-bold text-foreground">{myReview.writerName || "사용자"}</span>
                     </div>
-                    <div className="flex gap-4 text-sm text-muted-foreground mb-4 bg-secondary/30 p-3 rounded-lg w-fit">
-                      <span className="font-medium flex items-center gap-1.5"><Target className="w-4 h-4"/> 정답률: {myReview.difficulty}%</span>
-                      <Separator orientation="vertical" className="h-4" />
-                      <span className="font-medium flex items-center gap-1.5"><Clock className="w-4 h-4"/> 시간: {formatTime(myReview.timeTakenSeconds)}</span>
+                    <div className="flex gap-4 text-sm text-muted-foreground mb-4">
+                      <span>예상 정답률: {myReview.difficulty}%</span>
+                      <span>소요 시간: {formatTime(myReview.timeTakenSeconds)}</span>
+                      <span className="ml-auto text-muted-foreground/70">{formatDateTime(myReview.updatedAt)}</span>
                     </div>
-                    <p className="text-foreground leading-relaxed bg-background border border-border p-4 rounded-lg min-h-[80px]">
-                      {myReview.comment || "작성된 코멘트가 없습니다."}
-                    </p>
-                    <div className="flex gap-2 flex-wrap pt-2">
+                    <div className="text-base text-foreground leading-relaxed mb-4">
+                      {myReview.comment || "코멘트 내용"}
+                    </div>
+                    <div className="flex gap-2 flex-wrap mb-5">
                       {myReview.tags.map(t => <Badge key={t} variant="outline" className="bg-secondary/50">#{t}</Badge>)}
                     </div>
-                    <Button variant="outline" className="mt-6 w-full gap-2 font-bold" onClick={() => setIsEditingReview(true)}>
+                    <Button variant="secondary" className="w-full gap-2 font-bold bg-secondary hover:bg-secondary/80" onClick={() => setIsEditing(true)}>
                       <Pencil className="h-4 w-4" /> 의견 수정
                     </Button>
                   </div>
-                ) : (
+                )}
+
+                {/* 내 평가 입력/수정 폼 */}
+                {isEditing && (
                   <div className="space-y-6 animate-in fade-in">
-                    <div className="space-y-3">
-                      <Label className="text-foreground font-bold">예상 정답률 (100명 중 몇 명이 풀 수 있을까요?)</Label>
-                      <div className="flex items-center gap-4 bg-secondary/20 p-4 rounded-lg border border-border">
-                        <input
-                          type="range" min="0" max="100"
-                          value={reviewDiff}
-                          onChange={(e) => setReviewDiff(Number(e.target.value))}
-                          className="flex-1 accent-primary"
-                        />
-                        <span className="font-bold text-primary min-w-[120px] text-right">{getDiffText(reviewDiff)}</span>
+                    <div className="space-y-2">
+                      <Label className="font-bold text-muted-foreground">예상 정답률 (100명 중 몇 명이 풀 수 있을까요?)</Label>
+                      <div className="flex items-center gap-4">
+                        <input type="range" min="0" max="100" value={reviewDiff} onChange={e => setReviewDiff(Number(e.target.value))} className="flex-1 accent-primary" />
+                        <span className="font-bold text-primary min-w-[100px]">{getDiffText(reviewDiff)}</span>
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <Label className="text-foreground font-bold">소요 시간</Label>
+                    <div className="space-y-2">
+                      <Label className="font-bold text-muted-foreground">소요 시간</Label>
                       <div className="flex items-center gap-3">
-                        <Input type="number" min="0" placeholder="0" value={reviewMin} onChange={e => setReviewMin(Number(e.target.value))} className="w-24 text-center" />
-                        <span className="text-muted-foreground font-medium">분</span>
-                        <Input type="number" min="0" max="59" placeholder="0" value={reviewSec} onChange={e => setReviewSec(Number(e.target.value))} className="w-24 text-center" />
-                        <span className="text-muted-foreground font-medium">초</span>
+                        <Input type="number" min="0" placeholder="0" value={reviewMin} onChange={e => setReviewMin(Number(e.target.value))} className="w-20 text-center bg-background" />
+                        <span className="text-sm">분</span>
+                        <Input type="number" min="0" max="59" placeholder="0" value={reviewSec} onChange={e => setReviewSec(Number(e.target.value))} className="w-20 text-center bg-background" />
+                        <span className="text-sm">초</span>
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <Label className="text-foreground font-bold">태그 (이 문제의 특징을 분류해주세요)</Label>
-                      <div className="relative border border-border rounded-lg p-3 bg-background">
-                        <div className="flex flex-wrap gap-2 mb-2">
+                    <div className="space-y-2">
+                      <Label className="font-bold text-muted-foreground">태그 검색 (이 문제의 특징을 분류해주세요)</Label>
+                      <div className="relative">
+                        <div className="flex flex-wrap gap-2 mb-3">
                           {reviewTags.map(t => (
-                            <Badge key={t} variant="secondary" className="gap-1 px-2.5 py-1">
-                              #{t} <button onClick={() => removeTag(t)} className="ml-1 hover:text-destructive"><X className="h-3 w-3"/></button>
+                            <Badge key={t} variant="secondary" className="gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-50">
+                              #{t} <button onClick={() => removeTag(t)} className="ml-1 hover:text-destructive"><X className="h-3.5 w-3.5"/></button>
                             </Badge>
                           ))}
                         </div>
-                        <Input
-                          value={tagInput}
-                          onChange={e => searchTags(e.target.value)}
-                          placeholder="태그 검색 후 추가"
-                          className="border-none shadow-none focus-visible:ring-0 px-1"
-                        />
+                        <Input value={tagInput} onChange={e => searchTags(e.target.value)} placeholder="태그 검색" className="bg-background border-2" />
                         {tagSuggestions.length > 0 && (
-                          <div className="absolute top-full left-0 w-full z-10 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                            {tagSuggestions.map((tag) => (
+                          <div className="absolute top-full left-0 w-full z-10 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            {tagSuggestions.map(tag => (
                               <button key={tag.id} onClick={() => addTag(tag.name)} className="w-full text-left px-4 py-3 hover:bg-secondary transition-colors border-b border-border/50 last:border-0">
                                 <span className="font-bold text-foreground">#{tag.name}</span>
-                                {tag.description && <span className="text-xs text-muted-foreground ml-2 block mt-0.5">{tag.description}</span>}
+                                {tag.description && <span className="text-xs text-muted-foreground block mt-0.5">{tag.description}</span>}
                               </button>
                             ))}
                           </div>
@@ -554,75 +512,60 @@ export default function SolvePage() {
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <Label className="text-foreground font-bold">코멘트</Label>
-                      <Textarea
-                        value={reviewComment}
-                        onChange={e => setReviewComment(e.target.value)}
-                        placeholder="풀이나 다른 사람을 위한 팁을 남겨보세요..."
-                        className="min-h-[120px] bg-secondary/10"
-                      />
+                    <div className="space-y-2">
+                      <Label className="font-bold text-muted-foreground">코멘트</Label>
+                      <Textarea value={reviewComment} onChange={e => setReviewComment(e.target.value)} placeholder="풀이나 다른 사람을 위한 팁을 남겨보세요..." className="min-h-[100px] bg-secondary/20 resize-none" />
                     </div>
 
-                    <div className="flex flex-col gap-3 pt-2">
-                      <div className="flex gap-3">
-                        <Button onClick={saveReview} className="flex-2 w-full font-bold bg-emerald-600 hover:bg-emerald-700 text-white">
-                          평가 저장하기
+                    <div className="flex flex-col gap-2 pt-2">
+                      <div className="flex gap-2">
+                        <Button onClick={saveEvaluation} className="flex-[2] bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-6">
+                          평가 등록하기
                         </Button>
                         {myReview && (
-                          <Button variant="outline" onClick={() => setIsEditingReview(false)} className="flex-1 font-bold">취소</Button>
+                          <Button variant="secondary" onClick={() => setIsEditing(false)} className="flex-1 font-bold py-6 bg-secondary hover:bg-secondary/80 text-muted-foreground">
+                            취소
+                          </Button>
                         )}
                       </div>
                       {myReview && (
-                        <Button variant="ghost" onClick={deleteReview} className="text-destructive hover:text-destructive hover:bg-destructive/10 w-full mt-2">
+                        <Button variant="destructive" onClick={deleteEvaluation} className="w-full py-6 font-bold">
                           내 평가 삭제하기
                         </Button>
                       )}
                     </div>
                   </div>
                 )}
-              </div>
 
-              {/* Others' Reviews */}
-              <div className="pt-8 border-t-2 border-dashed border-border/60">
-                <h3 className="text-lg font-bold flex items-center gap-2 mb-6">
-                  <MessageSquare className="h-5 w-5 text-primary" /> 다른 사람들의 평가
-                </h3>
-                {othersReviews.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8 bg-secondary/30 rounded-xl border border-border">아직 다른 사람의 평가가 없습니다.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {othersReviews.map((r, idx) => (
-                      <Card key={idx} className="bg-card border-border shadow-sm hover:border-primary/30 transition-colors">
-                        <CardContent className="p-5">
+                {/* 타인 평가 목록 */}
+                <div className="pt-8 mt-10 border-t-2 border-dashed border-border">
+                  <h4 className="font-bold text-foreground mb-4">다른 사람들의 평가</h4>
+                  {othersReviews.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">아직 다른 사람의 평가가 없습니다.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {othersReviews.map((r, idx) => (
+                        <div key={idx} className="bg-secondary/20 p-5 rounded-xl border border-border">
                           <div className="flex justify-between items-center mb-3">
-                            <span className="font-bold text-foreground">{r.writerName || "익명"}</span>
-                            <span className="text-xs text-muted-foreground flex items-center gap-1.5"><CalendarDays className="w-3 h-3"/> {formatDate(r.updatedAt)}</span>
+                            <span className="font-extrabold text-foreground">{r.writerName || "익명"}</span>
+                            <span className="text-xs text-muted-foreground">{formatDateTime(r.updatedAt)}</span>
                           </div>
-                          <div className="flex gap-3 text-xs text-muted-foreground mb-4 bg-secondary/40 p-2.5 rounded-lg w-fit">
-                            <span className="font-semibold text-primary">예상 정답률 {r.difficulty}%</span>
-                            <Separator orientation="vertical" className="h-4" />
-                            <span className="font-semibold text-emerald-600">소요 시간 {formatTime(r.timeTakenSeconds)}</span>
+                          <div className="text-sm text-muted-foreground mb-3">
+                            예상정답률 {r.difficulty}% · 소요 시간 {Math.floor(r.timeTakenSeconds/60)}분 {r.timeTakenSeconds%60}초
                           </div>
-                          <p className="text-sm text-foreground leading-relaxed mb-4">
+                          <div className="text-[15px] text-foreground leading-relaxed mb-3">
                             {r.comment || "코멘트가 없습니다."}
-                          </p>
-                          <div className="flex gap-2 flex-wrap">
-                            {r.tags.map(t => <Badge key={t} variant="secondary" className="bg-background border-border shadow-sm text-xs px-2 py-0.5">#{t}</Badge>)}
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <Link href="/search" className="block mt-12">
-                <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 py-6 text-lg font-bold shadow-md">
-                  다음 문제 탐색 <ChevronRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-            </div>
+                          <div className="flex gap-2 flex-wrap">
+                            {r.tags.map(t => <Badge key={t} variant="secondary" className="bg-secondary text-muted-foreground">#{t}</Badge>)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
