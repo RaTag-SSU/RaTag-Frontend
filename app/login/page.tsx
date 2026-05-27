@@ -17,12 +17,20 @@ export default function LoginPage() {
   const [section, setSection] = useState<Section>("login")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  
   const [signupEmail, setSignupEmail] = useState("")
   const [signupNickname, setSignupNickname] = useState("")
   const [signupPassword, setSignupPassword] = useState("")
+  const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("") // 🚀 비밀번호 확인 상태 추가
+  
   const [isLoading, setIsLoading] = useState(false)
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      alert("이메일과 비밀번호를 입력해주세요.")
+      return
+    }
+
     setIsLoading(true)
     try {
       const res = await fetch("/api/users/login", {
@@ -32,7 +40,7 @@ export default function LoginPage() {
         credentials: "include",
       })
       if (res.ok) {
-        alert("로그인 성공!")
+        // 🚀 거슬리는 성공 알림창 삭제, 즉시 메인 페이지로 이동
         router.push("/")
       } else {
         const text = await res.text()
@@ -47,10 +55,17 @@ export default function LoginPage() {
   }
 
   const handleSignup = async () => {
-    if (!signupEmail || !signupNickname || !signupPassword) {
+    if (!signupEmail || !signupNickname || !signupPassword || !signupPasswordConfirm) {
       alert("모든 항목을 입력해주세요.")
       return
     }
+
+    // 🚀 비밀번호 2번 입력 일치 여부 검사
+    if (signupPassword !== signupPasswordConfirm) {
+      alert("비밀번호가 일치하지 않습니다. 다시 확인해주세요.")
+      return
+    }
+
     setIsLoading(true)
     try {
       const res = await fetch("/api/users/signup", {
@@ -62,12 +77,17 @@ export default function LoginPage() {
           password: signupPassword,
         }),
       })
+      
       if (res.ok) {
-        alert("회원가입이 완료되었습니다. 로그인해주세요.")
+        // 🚀 거슬리는 성공 알림창 삭제, 즉시 로그인 폼으로 이동하며 이메일 자동 채워주기
         setSection("login")
+        setEmail(signupEmail) // 사용 편의를 위해 가입한 이메일을 로그인 칸에 자동 입력
+        
+        // 가입 폼 초기화
         setSignupEmail("")
         setSignupNickname("")
         setSignupPassword("")
+        setSignupPasswordConfirm("")
       } else {
         const text = await res.text()
         alert("회원가입 실패: " + text)
@@ -142,26 +162,29 @@ export default function LoginPage() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         className="pl-10 bg-input border-border"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleLogin()
+                        }}
                       />
                     </div>
                   </div>
                   <Button
                     onClick={handleLogin}
                     disabled={isLoading}
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-2"
                   >
                     {isLoading ? "로그인 중..." : "로그인"}
                   </Button>
 
                   <button
                     onClick={() => setSection("signup")}
-                    className="w-full text-sm text-primary hover:underline"
+                    className="w-full text-sm text-primary hover:underline mt-2"
                   >
                     계정이 없으신가요? 회원가입
                   </button>
 
-                  <div className="relative">
-                    <Separator className="my-4" />
+                  <div className="relative my-6">
+                    <Separator />
                     <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
                       OR
                     </span>
@@ -169,7 +192,7 @@ export default function LoginPage() {
 
                   <a
                     href="/oauth2/authorization/google"
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-4 py-3 text-sm font-bold text-secondary-foreground hover:bg-secondary/80 transition-colors"
                   >
                     <svg className="h-4 w-4" viewBox="0 0 24 24">
                       <path
@@ -250,17 +273,37 @@ export default function LoginPage() {
                       />
                     </div>
                   </div>
+                  {/* 🚀 비밀번호 확인 추가 */}
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password-confirm" className="text-sm font-medium">
+                      비밀번호 확인
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="signup-password-confirm"
+                        type="password"
+                        placeholder="비밀번호를 다시 한 번 입력하세요"
+                        value={signupPasswordConfirm}
+                        onChange={(e) => setSignupPasswordConfirm(e.target.value)}
+                        className="pl-10 bg-input border-border"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSignup()
+                        }}
+                      />
+                    </div>
+                  </div>
                   <Button
                     onClick={handleSignup}
                     disabled={isLoading}
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 mt-2"
                   >
                     {isLoading ? "처리 중..." : "회원가입 완료"}
                   </Button>
 
                   <button
                     onClick={() => setSection("login")}
-                    className="w-full text-sm text-primary hover:underline"
+                    className="w-full text-sm text-primary hover:underline mt-2"
                   >
                     이미 계정이 있으신가요? 로그인
                   </button>
