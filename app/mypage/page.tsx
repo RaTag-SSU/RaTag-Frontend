@@ -25,6 +25,7 @@ import {
 import Link from "next/link"
 
 interface UserStats {
+  accuracy: number // 🚀 백엔드에서 넘겨주는 새로운 정답률
   weakTags: string[]
 }
 
@@ -47,7 +48,7 @@ export default function MyPage() {
   const [nickname, setNickname] = useState("")
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
-  const [newPasswordConfirm, setNewPasswordConfirm] = useState("") // 🚀 새 비밀번호 확인 상태 추가
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("")
   
   // 회원탈퇴 상태
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false)
@@ -72,7 +73,6 @@ export default function MyPage() {
       setUser(userData)
       setNickname(userData.nickname || userData.name || "")
 
-      // 학습 통계 데이터 (취약 태그용)
       const statsRes = await fetch("/api/users/stats")
       if (statsRes.ok) {
         const statsData = await statsRes.json()
@@ -91,7 +91,6 @@ export default function MyPage() {
       return
     }
 
-    // 🚀 새 비밀번호와 확인용 비밀번호 일치 여부 검사
     if (newPassword && newPassword !== newPasswordConfirm) {
       alert("새 비밀번호가 일치하지 않습니다. 다시 확인해주세요.")
       return
@@ -165,11 +164,12 @@ export default function MyPage() {
     )
   }
 
-  // 🚀 문제 리스트 기반으로 정확한 통계 직접 계산
   const correctCount = user?.solvedProblemIds?.length || 0
   const wrongCount = user?.wrongProblemIds?.length || 0
   const totalSolved = correctCount + wrongCount
-  const accuracy = totalSolved > 0 ? (correctCount / totalSolved) * 100 : 0
+  
+  // 🚀 백엔드가 넘겨주는 정확한 정답률(stats.accuracy)을 최우선으로 사용! (백엔드 구현 전에는 기존 공식 fallback 적용)
+  const accuracy = stats?.accuracy ?? (totalSolved > 0 ? (correctCount / totalSolved) * 100 : 0)
   const weakTags = stats?.weakTags ?? []
 
   return (
@@ -189,7 +189,6 @@ export default function MyPage() {
             </div>
           </div>
           
-          {/* 🚀 홈으로 버튼 대신 탈퇴 팝업(Dialog) 버튼으로 교체 */}
           <Dialog open={isWithdrawOpen} onOpenChange={setIsWithdrawOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2 border-destructive/50 text-destructive hover:bg-destructive hover:text-white transition-colors">
@@ -247,7 +246,6 @@ export default function MyPage() {
           </Dialog>
         </div>
 
-        {/* 🚀 좌/우 카드 높이를 맞추기 위해 items-stretch 적용 */}
         <div className="grid gap-6 lg:grid-cols-2 items-stretch mb-6">
           {/* Profile Settings */}
           <Card className="bg-card border-border flex flex-col h-full">
@@ -305,7 +303,6 @@ export default function MyPage() {
                     className="bg-input border-border"
                   />
                 </div>
-                {/* 🚀 새 비밀번호 확인 필드 추가 */}
                 <div className="space-y-2">
                   <Label htmlFor="newPasswordConfirm">새 비밀번호 확인</Label>
                   <Input
@@ -376,17 +373,17 @@ export default function MyPage() {
 
               <Separator />
 
-              {/* Quick Stats */}
+              {/* 🚀 Quick Stats - 배경 투명도와 테두리를 통일하여 조화롭게 배치 */}
               <div className="grid grid-cols-3 gap-4 pt-2">
-                <div className="text-center p-3 rounded-lg bg-secondary/60">
+                <div className="text-center p-3 rounded-lg bg-primary/10 border border-primary/20">
                   <BookOpen className="h-5 w-5 mx-auto mb-1 text-primary" />
-                  <p className="text-2xl font-bold text-foreground">{totalSolved}</p>
-                  <p className="text-xs text-muted-foreground mt-1">총 풀이</p>
+                  <p className="text-2xl font-bold text-primary">{totalSolved}</p>
+                  <p className="text-xs text-primary/70 mt-1">총 풀이</p>
                 </div>
-                <div className="text-center p-3 rounded-lg bg-emerald-50 border border-emerald-100">
+                <div className="text-center p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                   <Trophy className="h-5 w-5 mx-auto mb-1 text-emerald-500" />
-                  <p className="text-2xl font-bold text-emerald-600">{correctCount}</p>
-                  <p className="text-xs text-emerald-600/70 mt-1">성공</p>
+                  <p className="text-2xl font-bold text-emerald-500">{correctCount}</p>
+                  <p className="text-xs text-emerald-500/70 mt-1">성공</p>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-destructive/10 border border-destructive/20">
                   <AlertTriangle className="h-5 w-5 mx-auto mb-1 text-destructive" />
@@ -398,7 +395,6 @@ export default function MyPage() {
           </Card>
         </div>
 
-        {/* 🚀 전체 학습 기록을 좌우 2단 그리드 밖으로 빼내어 화면(가로) 전체를 꽉 채우도록 배치 */}
         <Card className="bg-card border-border w-full">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
