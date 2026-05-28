@@ -71,7 +71,11 @@ export function Navbar() {
             })}
           </nav>
         </div>
+        
         <div className="flex items-center gap-3">
+          
+          <ThemeToggle />
+
           {isLoading ? (
             <div className="w-20 h-8 bg-secondary rounded animate-pulse" />
           ) : isLoggedIn ? (
@@ -109,6 +113,7 @@ export function Navbar() {
           )}
         </div>
       </div>
+      
       {/* Mobile Navigation */}
       <nav className="md:hidden flex items-center justify-around border-t border-border py-2">
         {navItems.map((item) => {
