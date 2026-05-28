@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://after-decor-warning-gained.trycloudflare.com/api/:path*"
+      "destination": "https://other-insertion-lecture-tonight.trycloudflare.com/api/:path*"
     },
     {
       "source": "/oauth2/:path*",
