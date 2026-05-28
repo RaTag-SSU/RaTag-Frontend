@@ -318,7 +318,13 @@ export default function SolvePage() {
       {/* Left Pane - Problem Viewer */}
       <div className="bg-card border-r border-border flex flex-col overflow-hidden" style={{ width: `${leftPaneWidth}%` }}>
         {problem.pdfUrl ? (
-          <iframe src={problem.pdfUrl} className="w-full h-full border-none" title="PDF Viewer" />
+          <iframe 
+            src={problem.pdfUrl} 
+            className="w-full h-full border-none" 
+            title="PDF Viewer"
+            // 🚀 핵심 수정 부분: 드래그 중일 때는 마우스 이벤트를 무시하게 만듦
+            style={{ pointerEvents: isDragging ? "none" : "auto" }} 
+          />
         ) : (
           <div className="flex-1 overflow-y-auto p-12">
             <div className="max-w-3xl mx-auto">
