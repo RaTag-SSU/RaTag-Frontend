@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { BookOpen, Users, Globe, User, LogIn, LogOut, Tag, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 const navItems = [
   { href: "/public-problems", label: "공개 문제", icon: Globe },
