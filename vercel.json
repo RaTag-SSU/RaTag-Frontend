@@ -6,11 +6,11 @@
     },
     {
       "source": "/oauth2/:path*",
-      "destination": "https://after-decor-warning-gained.trycloudflare.com/oauth2/:path*"
+      "destination": "https://other-insertion-lecture-tonight.trycloudflare.com/oauth2/:path*"
     },
     {
       "source": "/login/oauth2/:path*",
-      "destination": "https://after-decor-warning-gained.trycloudflare.com/login/oauth2/:path*"
+      "destination": "https://other-insertion-lecture-tonight.trycloudflare.com/login/oauth2/:path*"
     }
   ]
 }
