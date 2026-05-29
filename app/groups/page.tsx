@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation" // 🚀 useRouter 추가
 import { Navbar } from "@/components/navbar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,8 @@ interface Group {
 }
 
 export default function GroupsPage() {
+  const router = useRouter()
+  const [isAuthorized, setIsAuthorized] = useState(false) // 🚀 권한 확인 상태 추가
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState("my")
@@ -34,8 +37,26 @@ export default function GroupsPage() {
   const [newGroupDesc, setNewGroupDesc] = useState("")
 
   useEffect(() => {
-    loadGroups()
-  }, [])
+    // 🚀 화면이 켜지자마자 권한부터 검사합니다.
+    const checkAuthAndLoad = async () => {
+      try {
+        const authRes = await fetch("/api/users/me")
+        if (!authRes.ok) {
+          alert("로그인이 필요한 서비스입니다.")
+          router.push("/login")
+          return
+        }
+        
+        // 권한이 확인되면 화면을 열어주고 그룹 데이터를 불러옵니다.
+        setIsAuthorized(true)
+        loadGroups()
+      } catch (e) {
+        router.push("/login")
+      }
+    }
+
+    checkAuthAndLoad()
+  }, [router])
 
   const loadGroups = () => {
     fetch("/api/groups")
@@ -71,6 +92,18 @@ export default function GroupsPage() {
       alert("가입 신청이 완료되었습니다.")
       loadGroups()
     }
+  }
+
+  // 🚀 권한을 확인하는 찰나의 순간 동안 보여줄 화면 (깜빡임 방지용)
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-muted-foreground animate-pulse font-bold">권한을 확인하는 중입니다...</p>
+        </main>
+      </div>
+    )
   }
 
   const myGroups = groups.filter((g) => g.role !== "NONE")
