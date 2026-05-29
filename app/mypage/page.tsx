@@ -63,22 +63,21 @@ export default function MyPage() {
 
   const fetchUserData = async () => {
     try {
-      const res = await fetch("/api/users/me")
+      // 🚀 데이터 요청마다 { cache: "no-store" } 추가
+      const res = await fetch("/api/users/me", { cache: "no-store" })
       
-      // 🚀 1. 인증 실패 시: 에러 메시지 띄우고 로그인 창으로 이동.
-      // (이때 setIsLoading(false)를 호출하지 않아 화면 번쩍임을 방지합니다.)
       if (!res.ok) {
         alert("로그인이 필요한 서비스입니다.")
         router.push("/login")
         return 
       }
       
-      // 🚀 2. 인증 성공 시: 데이터를 세팅하고 로딩을 해제합니다.
       const userData = await res.json()
       setUser(userData)
       setNickname(userData.nickname || userData.name || "")
 
-      const statsRes = await fetch("/api/users/stats")
+      // 🚀 여기도 통계 캐싱 방지
+      const statsRes = await fetch("/api/users/stats", { cache: "no-store" })
       if (statsRes.ok) {
         const statsData = await statsRes.json()
         setStats(statsData)
