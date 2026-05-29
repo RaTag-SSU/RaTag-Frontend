@@ -102,7 +102,7 @@ export default function GroupDetailPage() {
         const authRes = await fetch("/api/users/me", { cache: "no-store" })
         if (!authRes.ok) {
           alert("로그인이 필요한 서비스입니다.")
-          router.push("/login")
+          window.location.href = "/login?new=1"
           return
         }
         
