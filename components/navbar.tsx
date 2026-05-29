@@ -21,7 +21,8 @@ export function Navbar() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    fetch("/api/users/me")
+    // 🚀 프론트엔드가 과거 기억(캐시)을 믿지 않고 항상 실시간으로 확인하게 만듭니다.
+    fetch("/api/users/me", { cache: "no-store" })
       .then((res) => {
         setIsLoggedIn(res.ok)
         setIsLoading(false)
@@ -73,7 +74,6 @@ export function Navbar() {
         </div>
         
         <div className="flex items-center gap-3">
-          
           <ThemeToggle />
 
           {isLoading ? (
