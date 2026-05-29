@@ -44,7 +44,7 @@ export default function GroupsPage() {
         
         if (!authRes.ok) {
           alert("로그인이 만료되었거나 권한이 없습니다.") // 이 알림이 떠야 정상 적용된 것입니다.
-          router.push("/login")
+          window.location.href = "/login?new=1"
           return
         }
         
