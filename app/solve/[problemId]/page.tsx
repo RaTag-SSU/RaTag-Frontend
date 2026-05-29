@@ -88,6 +88,15 @@ export default function SolvePage() {
 
     const initData = async () => {
       try {
+        // 🚀 1. 인증 실패 시: 로딩 화면(true)을 유지한 채로 즉시 로그인 창으로 튕겨냅니다.
+        const authRes = await fetch("/api/users/me")
+        if (!authRes.ok) {
+          alert("로그인이 필요한 서비스입니다.")
+          router.push("/login")
+          return 
+        }
+
+        // 🚀 2. 인증 통과 시: 정상적으로 문제 데이터와 상태를 불러옵니다.
         const [pRes, sRes] = await Promise.all([
           fetch(`/api/problems/${problemId}`),
           fetch(`/api/submissions/status/${problemId}`)
@@ -104,10 +113,13 @@ export default function SolvePage() {
             loadReviewDashboard()
           }
         }
+        
+        // 모든 세팅이 끝나면 화면을 보여줍니다.
+        setLoading(false)
+
       } catch (error) {
         console.error(error)
-      } finally {
-        setLoading(false)
+        router.push("/login")
       }
     }
 
@@ -292,7 +304,7 @@ export default function SolvePage() {
       <div className="h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse space-y-4 text-center">
           <BookOpen className="h-16 w-16 mx-auto text-muted-foreground" />
-          <p className="text-muted-foreground">문제를 불러오는 중...</p>
+          <p className="text-muted-foreground">권한을 확인하는 중입니다...</p>
         </div>
       </div>
     )
