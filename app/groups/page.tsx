@@ -39,10 +39,11 @@ export default function GroupsPage() {
   useEffect(() => {
     const checkAuthAndLoad = async () => {
       try {
-        // 🚀 cache: 'no-store' 추가로 캐싱 무효화
-        const authRes = await fetch("/api/users/me", { cache: "no-store" })
+        // 🚀 핵심: URL 뒤에 ?t=시간값을 붙여서 브라우저 캐시를 강제로 무력화합니다!
+        const authRes = await fetch(`/api/users/me?t=${Date.now()}`, { cache: "no-store" })
+        
         if (!authRes.ok) {
-          alert("로그인이 필요한 서비스입니다.")
+          alert("로그인이 만료되었거나 권한이 없습니다.") // 이 알림이 떠야 정상 적용된 것입니다.
           router.push("/login")
           return
         }
@@ -50,8 +51,7 @@ export default function GroupsPage() {
         setIsAuthorized(true)
         loadGroups()
       } catch (e) {
-        // 🚀 에러 발생 시 무작정 튕기지 않고 콘솔에만 기록
-        console.error("인증 확인 중 오류:", e)
+        console.error("인증 오류:", e)
       }
     }
 
@@ -59,9 +59,12 @@ export default function GroupsPage() {
   }, [router])
 
   const loadGroups = () => {
-    // 🚀 여기도 캐싱 무효화
-    fetch("/api/groups", { cache: "no-store" })
-      .then((res) => res.json())
+    // 🚀 여기도 타임스탬프를 붙여 무조건 최신 그룹 목록을 가져오게 합니다.
+    fetch(`/api/groups?t=${Date.now()}`, { cache: "no-store" })
+      .then((res) => {
+        if (!res.ok) throw new Error("그룹 데이터를 불러오지 못했습니다.")
+        return res.json()
+      })
       .then((data) => {
         setGroups(data)
         setLoading(false)
@@ -142,7 +145,6 @@ export default function GroupsPage() {
       <Navbar />
 
       <main className="container mx-auto px-4 py-8">
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -194,7 +196,6 @@ export default function GroupsPage() {
           </Dialog>
         </div>
 
-        {/* Tabs */}
         <Tabs value={tab} onValueChange={setTab} className="w-full">
           <TabsList className="w-full max-w-md bg-secondary border border-border">
             <TabsTrigger value="my" className="flex-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
