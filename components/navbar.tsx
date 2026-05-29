@@ -103,13 +103,14 @@ export function Navbar() {
               </Button>
             </>
           ) : (
-            <Link
+            // 🚀 Link 대신 일반 a 태그를 사용하여 Next.js의 지독한 캐싱을 강제로 부수고 이동합니다!
+            <a
               href="/login"
               className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <LogIn className="h-4 w-4" />
               로그인
-            </Link>
+            </a>
           )}
         </div>
       </div>
