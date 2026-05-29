@@ -68,7 +68,7 @@ export default function MyPage() {
       
       if (!res.ok) {
         alert("로그인이 필요한 서비스입니다.")
-        router.push("/login")
+        window.location.href = "/login?new=1"
         return 
       }
       
@@ -87,7 +87,7 @@ export default function MyPage() {
 
     } catch (e) {
       console.error(e)
-      router.push("/login")
+      window.location.href = "/login?new=1"
     }
   }
 
