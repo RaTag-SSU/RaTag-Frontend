@@ -49,7 +49,6 @@ interface Group {
   role: "ADMIN" | "MEMBER" | "PENDING" | "NONE"
 }
 
-// 🚀 공개/검색 문제와 완벽히 통일된 Problem 인터페이스
 interface Problem {
   id: number
   title: string
@@ -73,7 +72,7 @@ export default function GroupDetailPage() {
   const router = useRouter()
   const groupId = params.groupId as string
 
-  const [isAuthorized, setIsAuthorized] = useState(false) // 🚀 권한 확인 상태 추가
+  const [isAuthorized, setIsAuthorized] = useState(false)
   const [group, setGroup] = useState<Group | null>(null)
   const [problems, setProblems] = useState<Problem[]>([])
   const [members, setMembers] = useState<Member[]>([])
@@ -83,7 +82,6 @@ export default function GroupDetailPage() {
   const [mode, setMode] = useState<"CREATE" | "UPDATE">("CREATE")
   const [editingProblem, setEditingProblem] = useState<Problem | null>(null)
   
-  // 🚀 1열/3열 뷰 모드 및 태그 토글 상태 추가
   const [viewMode, setViewMode] = useState<"list" | "grid">("list")
   const [expandedTags, setExpandedTags] = useState<Set<number>>(new Set())
 
@@ -100,8 +98,8 @@ export default function GroupDetailPage() {
 
     const checkAuthAndLoad = async () => {
       try {
-        // 🚀 1. 화면이 켜지자마자 권한부터 찌릅니다.
-        const authRes = await fetch("/api/users/me")
+        // 🚀 캐싱 방지 옵션 추가
+        const authRes = await fetch("/api/users/me", { cache: "no-store" })
         if (!authRes.ok) {
           alert("로그인이 필요한 서비스입니다.")
           router.push("/login")
@@ -111,12 +109,11 @@ export default function GroupDetailPage() {
         const user = await authRes.json()
         const isAdmin = user.role === "ROLE_ADMIN"
         setIsSiteAdmin(isAdmin)
-        setIsAuthorized(true) // 권한 확인 완료!
+        setIsAuthorized(true) 
         
-        // 🚀 2. React의 비동기 상태 업데이트 문제를 해결하기 위해 isAdmin을 직접 파라미터로 넘깁니다.
         loadGroupData(isAdmin)
       } catch (e) {
-        router.push("/login")
+        console.error("인증 확인 에러:", e)
       }
     }
 
@@ -124,7 +121,7 @@ export default function GroupDetailPage() {
   }, [groupId, router])
 
   const loadGroupData = (isAdminStatus: boolean) => {
-    fetch("/api/groups")
+    fetch("/api/groups", { cache: "no-store" }) // 🚀 캐싱 방지
       .then((res) => res.json())
       .then((groups: Group[]) => {
         const foundGroup = groups.find((g) => g.id === Number(groupId))
@@ -142,7 +139,6 @@ export default function GroupDetailPage() {
       })
   }
 
-  // 🚀 통계 및 태그를 가져오기 위해 /api/problems/search API를 사용하도록 교체
   const loadProblems = async () => {
     try {
       const res = await fetch("/api/problems/search", {
@@ -152,7 +148,8 @@ export default function GroupDetailPage() {
           groupId: Number(groupId),
           page: 0,
           size: 100
-        })
+        }),
+        cache: "no-store" // 🚀 캐싱 방지
       })
       if (res.ok) {
         const data = await res.json()
@@ -164,7 +161,7 @@ export default function GroupDetailPage() {
   }
 
   const loadMembers = () => {
-    fetch(`/api/groups/${groupId}/members`)
+    fetch(`/api/groups/${groupId}/members`, { cache: "no-store" }) // 🚀 캐싱 방지
       .then((res) => res.json())
       .then((data) => setMembers(data))
   }
@@ -186,7 +183,7 @@ export default function GroupDetailPage() {
   }
 
   const openUpdateForm = async (problemId: number) => {
-    const res = await fetch(`/api/problems/${problemId}`)
+    const res = await fetch(`/api/problems/${problemId}`, { cache: "no-store" })
     const problem = await res.json()
     setMode("UPDATE")
     setEditingProblem(problem)
@@ -278,7 +275,6 @@ export default function GroupDetailPage() {
     }
   }
 
-  // 🚀 1. 권한 확인 전 로딩 화면 (깜빡임 방지)
   if (!isAuthorized) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
@@ -290,7 +286,6 @@ export default function GroupDetailPage() {
     )
   }
 
-  // 🚀 2. 권한은 통과했으나 데이터를 불러오는 중일 때의 화면
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -319,7 +314,6 @@ export default function GroupDetailPage() {
       <Navbar />
 
       <main className="container mx-auto px-4 py-8 max-w-5xl">
-        {/* Header */}
         <div className="mb-8">
           <Link
             href="/groups"
@@ -347,7 +341,6 @@ export default function GroupDetailPage() {
           </div>
         </div>
 
-        {/* Pending Screen */}
         {group.role === "PENDING" && (
           <Card className="bg-warning/10 border-warning/30">
             <CardContent className="flex flex-col items-center justify-center py-16">
@@ -358,7 +351,6 @@ export default function GroupDetailPage() {
           </Card>
         )}
 
-        {/* Main Content */}
         {canViewContent && (
           <Tabs defaultValue="problems" className="w-full">
             <TabsList className="w-full max-w-md bg-secondary border border-border">
@@ -393,7 +385,6 @@ export default function GroupDetailPage() {
                   <div /> /* Flex spacing 유지용 */
                 )}
 
-                {/* 🚀 1열 / 3열 뷰 모드 토글 */}
                 <div className="flex items-center border rounded-lg p-0.5 bg-muted/50 self-end sm:self-auto">
                   <Button
                     variant={viewMode === "list" ? "secondary" : "ghost"}
@@ -520,7 +511,6 @@ export default function GroupDetailPage() {
                 </div>
               )}
 
-              {/* Problem Form Dialog */}
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="bg-card border-border max-w-lg max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
@@ -600,7 +590,6 @@ export default function GroupDetailPage() {
               </Dialog>
             </TabsContent>
 
-            {/* Members Tab */}
             <TabsContent value="members" className="mt-6 space-y-6">
               {/* Pending Members */}
               <Card className="bg-card border-border">
