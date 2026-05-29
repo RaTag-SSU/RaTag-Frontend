@@ -21,7 +21,7 @@ export default function LoginPage() {
   const [signupEmail, setSignupEmail] = useState("")
   const [signupNickname, setSignupNickname] = useState("")
   const [signupPassword, setSignupPassword] = useState("")
-  const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("") // 🚀 비밀번호 확인 상태 추가
+  const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("")
   
   const [isLoading, setIsLoading] = useState(false)
 
@@ -40,8 +40,8 @@ export default function LoginPage() {
         credentials: "include",
       })
       if (res.ok) {
-        // 🚀 거슬리는 성공 알림창 삭제, 즉시 메인 페이지로 이동
-        router.push("/")
+        // 🚀 핵심 수정 부분: Next.js의 부질없는 캐시를 날려버리고 강제로 브라우저를 새로고침하며 이동시킵니다!
+        window.location.href = "/"
       } else {
         const text = await res.text()
         alert("로그인 실패: " + text)
@@ -60,7 +60,6 @@ export default function LoginPage() {
       return
     }
 
-    // 🚀 비밀번호 2번 입력 일치 여부 검사
     if (signupPassword !== signupPasswordConfirm) {
       alert("비밀번호가 일치하지 않습니다. 다시 확인해주세요.")
       return
@@ -79,11 +78,9 @@ export default function LoginPage() {
       })
       
       if (res.ok) {
-        // 🚀 거슬리는 성공 알림창 삭제, 즉시 로그인 폼으로 이동하며 이메일 자동 채워주기
         setSection("login")
-        setEmail(signupEmail) // 사용 편의를 위해 가입한 이메일을 로그인 칸에 자동 입력
+        setEmail(signupEmail) 
         
-        // 가입 폼 초기화
         setSignupEmail("")
         setSignupNickname("")
         setSignupPassword("")
@@ -273,7 +270,6 @@ export default function LoginPage() {
                       />
                     </div>
                   </div>
-                  {/* 🚀 비밀번호 확인 추가 */}
                   <div className="space-y-2">
                     <Label htmlFor="signup-password-confirm" className="text-sm font-medium">
                       비밀번호 확인
