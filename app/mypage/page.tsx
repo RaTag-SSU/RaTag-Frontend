@@ -25,7 +25,7 @@ import {
 import Link from "next/link"
 
 interface UserStats {
-  accuracy: number // 🚀 백엔드에서 넘겨주는 새로운 정답률
+  accuracy: number 
   weakTags: string[]
 }
 
@@ -64,11 +64,16 @@ export default function MyPage() {
   const fetchUserData = async () => {
     try {
       const res = await fetch("/api/users/me")
+      
+      // 🚀 1. 인증 실패 시: 에러 메시지 띄우고 로그인 창으로 이동.
+      // (이때 setIsLoading(false)를 호출하지 않아 화면 번쩍임을 방지합니다.)
       if (!res.ok) {
-        alert("로그인이 필요합니다.")
+        alert("로그인이 필요한 서비스입니다.")
         router.push("/login")
-        return
+        return 
       }
+      
+      // 🚀 2. 인증 성공 시: 데이터를 세팅하고 로딩을 해제합니다.
       const userData = await res.json()
       setUser(userData)
       setNickname(userData.nickname || userData.name || "")
@@ -78,10 +83,12 @@ export default function MyPage() {
         const statsData = await statsRes.json()
         setStats(statsData)
       }
+      
+      setIsLoading(false) 
+
     } catch (e) {
       console.error(e)
-    } finally {
-      setIsLoading(false)
+      router.push("/login")
     }
   }
 
@@ -153,12 +160,10 @@ export default function MyPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <Navbar />
-        <main className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground animate-pulse font-bold">데이터를 불러오는 중입니다...</p>
-          </div>
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-muted-foreground animate-pulse font-bold">권한을 확인하는 중입니다...</p>
         </main>
       </div>
     )
@@ -168,7 +173,6 @@ export default function MyPage() {
   const wrongCount = user?.wrongProblemIds?.length || 0
   const totalSolved = correctCount + wrongCount
   
-  // 🚀 백엔드가 넘겨주는 정확한 정답률(stats.accuracy)을 최우선으로 사용! (백엔드 구현 전에는 기존 공식 fallback 적용)
   const accuracy = stats?.accuracy ?? (totalSolved > 0 ? (correctCount / totalSolved) * 100 : 0)
   const weakTags = stats?.weakTags ?? []
 
