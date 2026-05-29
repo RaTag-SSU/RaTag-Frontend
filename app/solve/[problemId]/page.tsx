@@ -88,7 +88,6 @@ export default function SolvePage() {
 
     const initData = async () => {
       try {
-        // 🚀 캐싱 방지
         const authRes = await fetch("/api/users/me", { cache: "no-store" })
         if (!authRes.ok) {
           alert("로그인이 필요한 서비스입니다.")
@@ -96,7 +95,6 @@ export default function SolvePage() {
           return 
         }
 
-        // 🚀 데이터 요청들도 캐싱 무효화
         const [pRes, sRes] = await Promise.all([
           fetch(`/api/problems/${problemId}`, { cache: "no-store" }),
           fetch(`/api/submissions/status/${problemId}`, { cache: "no-store" })
@@ -118,7 +116,6 @@ export default function SolvePage() {
 
       } catch (error) {
         console.error("데이터 초기화 중 에러:", error)
-        // 🚀 쓸데없는 에러(ex. JSON 파싱 실패) 때문에 튕기지 않게 방지
         setLoading(false)
       }
     }
@@ -196,7 +193,6 @@ export default function SolvePage() {
   // 리뷰 대시보드 로드
   const loadReviewDashboard = async () => {
     try {
-      // 🚀 리뷰 관련 통계들도 모두 캐싱 무효화
       const sumRes = await fetch(`/api/problems/${problemId}/reviews/summary`, { cache: "no-store" })
       if (sumRes.ok) setSummary(await sumRes.json())
 
@@ -204,7 +200,7 @@ export default function SolvePage() {
       if (meRes.ok && meRes.status !== 204) {
         const myData: Review = await meRes.json()
         setMyReview(myData)
-        setIsEditing(false) // 내 리뷰가 있으면 디스플레이 모드
+        setIsEditing(false) 
         
         setReviewDiff(myData.difficulty)
         setReviewMin(Math.floor(myData.timeTakenSeconds / 60))
@@ -212,7 +208,7 @@ export default function SolvePage() {
         setReviewComment(myData.comment)
         setReviewTags(myData.tags)
       } else {
-        setIsEditing(true) // 없으면 입력 폼 모드
+        setIsEditing(true) 
       }
 
       const othersRes = await fetch(`/api/problems/${problemId}/reviews`, { cache: "no-store" })
@@ -432,18 +428,22 @@ export default function SolvePage() {
                   ✅ 정답입니다! 문제에 대한 정보를 남겨주세요.
                 </div>
 
-                {/* 문제 종합 데이터 */}
+                {/* 🚀 문제 종합 데이터 수정 (null/데이터 없음 처리 로직 추가) */}
                 <div className="flex gap-4">
                   <div className="flex-1 bg-secondary/40 border border-border rounded-xl p-4 text-center">
                     <span className="text-xs font-bold text-muted-foreground block mb-1">평균 예상 정답률</span>
                     <span className="text-lg font-extrabold text-foreground">
-                      {summary?.avgDifficulty ? `${Math.round(summary.avgDifficulty)}%` : "로딩중"}
+                      {summary 
+                        ? (summary.avgDifficulty !== null ? `${Math.round(summary.avgDifficulty)}%` : "통계 없음") 
+                        : "로딩중"}
                     </span>
                   </div>
                   <div className="flex-1 bg-secondary/40 border border-border rounded-xl p-4 text-center">
                     <span className="text-xs font-bold text-muted-foreground block mb-1">평균 소요 시간</span>
                     <span className="text-lg font-extrabold text-foreground">
-                      {summary?.avgTimeSeconds ? formatTime(summary.avgTimeSeconds) : "로딩중"}
+                      {summary 
+                        ? (summary.avgTimeSeconds !== null ? formatTime(summary.avgTimeSeconds) : "통계 없음") 
+                        : "로딩중"}
                     </span>
                   </div>
                 </div>
