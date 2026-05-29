@@ -21,7 +21,6 @@ export function Navbar() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // 🚀 프론트엔드가 과거 기억(캐시)을 믿지 않고 항상 실시간으로 확인하게 만듭니다.
     fetch("/api/users/me", { cache: "no-store" })
       .then((res) => {
         setIsLoggedIn(res.ok)
@@ -33,10 +32,21 @@ export function Navbar() {
       })
   }, [])
 
+  // 🚀 요청하신 완벽한 로그아웃 로직으로 교체!
   const handleLogout = async () => {
-    const res = await fetch("/api/users/logout", { method: "POST" })
-    if (res.ok) {
-      window.location.reload()
+    setIsLoading(true) // 버튼 연타 방지
+    try {
+      // 1. 백엔드에 명시적으로 세션 파기 요청
+      await fetch("/api/users/logout", { method: "POST", cache: "no-store" })
+      
+      // 2. 브라우저에 남아있을 수 있는 쿠키 찌꺼기 강제 삭제
+      document.cookie = "JSESSIONID=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "SESSION=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    } catch (e) {
+      console.error("로그아웃 오류:", e)
+    } finally {
+      // 3. Vercel의 캐시를 뚫고 강제로 새로고침하며 초기화
+      window.location.href = "/?logout=clear"
     }
   }
 
@@ -103,9 +113,9 @@ export function Navbar() {
               </Button>
             </>
           ) : (
-            // 🚀 Link 대신 일반 a 태그를 사용하여 Next.js의 지독한 캐싱을 강제로 부수고 이동합니다!
+            // 🚀 Vercel 엣지 캐시 우회: URL 뒤에 ?new=1 을 붙여 새로운 페이지로 인식시킵니다.
             <a
-              href="/login"
+              href="/login?new=1"
               className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <LogIn className="h-4 w-4" />
