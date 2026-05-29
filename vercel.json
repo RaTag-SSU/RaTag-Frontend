@@ -2,15 +2,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://other-insertion-lecture-tonight.trycloudflare.com/api/:path*"
+      "destination": "https://wesley-councils-construct-ham.trycloudflare.com/api/:path*"
     },
     {
       "source": "/oauth2/:path*",
-      "destination": "https://other-insertion-lecture-tonight.trycloudflare.com/oauth2/:path*"
+      "destination": "https://wesley-councils-construct-ham.trycloudflare.com/oauth2/:path*"
     },
     {
       "source": "/login/oauth2/:path*",
-      "destination": "https://other-insertion-lecture-tonight.trycloudflare.com/login/oauth2/:path*"
+      "destination": "https://wesley-councils-construct-ham.trycloudflare.com/login/oauth2/:path*"
     }
   ]
 }
