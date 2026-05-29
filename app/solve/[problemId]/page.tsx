@@ -67,7 +67,7 @@ export default function SolvePage() {
   const [summary, setSummary] = useState<ReviewSummary | null>(null)
   const [myReview, setMyReview] = useState<Review | null>(null)
   const [othersReviews, setOthersReviews] = useState<Review[]>([])
-  const [isEditing, setIsEditing] = useState(false) // 보기 모드 / 수정 모드 토글
+  const [isEditing, setIsEditing] = useState(false)
 
   // 폼 입력 상태
   const [reviewDiff, setReviewDiff] = useState(50)
@@ -88,18 +88,18 @@ export default function SolvePage() {
 
     const initData = async () => {
       try {
-        // 🚀 1. 인증 실패 시: 로딩 화면(true)을 유지한 채로 즉시 로그인 창으로 튕겨냅니다.
-        const authRes = await fetch("/api/users/me")
+        // 🚀 캐싱 방지
+        const authRes = await fetch("/api/users/me", { cache: "no-store" })
         if (!authRes.ok) {
           alert("로그인이 필요한 서비스입니다.")
           router.push("/login")
           return 
         }
 
-        // 🚀 2. 인증 통과 시: 정상적으로 문제 데이터와 상태를 불러옵니다.
+        // 🚀 데이터 요청들도 캐싱 무효화
         const [pRes, sRes] = await Promise.all([
-          fetch(`/api/problems/${problemId}`),
-          fetch(`/api/submissions/status/${problemId}`)
+          fetch(`/api/problems/${problemId}`, { cache: "no-store" }),
+          fetch(`/api/submissions/status/${problemId}`, { cache: "no-store" })
         ])
 
         if (pRes.ok) setProblem(await pRes.json())
@@ -114,12 +114,12 @@ export default function SolvePage() {
           }
         }
         
-        // 모든 세팅이 끝나면 화면을 보여줍니다.
         setLoading(false)
 
       } catch (error) {
-        console.error(error)
-        router.push("/login")
+        console.error("데이터 초기화 중 에러:", error)
+        // 🚀 쓸데없는 에러(ex. JSON 파싱 실패) 때문에 튕기지 않게 방지
+        setLoading(false)
       }
     }
 
@@ -196,10 +196,11 @@ export default function SolvePage() {
   // 리뷰 대시보드 로드
   const loadReviewDashboard = async () => {
     try {
-      const sumRes = await fetch(`/api/problems/${problemId}/reviews/summary`)
+      // 🚀 리뷰 관련 통계들도 모두 캐싱 무효화
+      const sumRes = await fetch(`/api/problems/${problemId}/reviews/summary`, { cache: "no-store" })
       if (sumRes.ok) setSummary(await sumRes.json())
 
-      const meRes = await fetch(`/api/problems/${problemId}/reviews/me`)
+      const meRes = await fetch(`/api/problems/${problemId}/reviews/me`, { cache: "no-store" })
       if (meRes.ok && meRes.status !== 204) {
         const myData: Review = await meRes.json()
         setMyReview(myData)
@@ -214,7 +215,7 @@ export default function SolvePage() {
         setIsEditing(true) // 없으면 입력 폼 모드
       }
 
-      const othersRes = await fetch(`/api/problems/${problemId}/reviews`)
+      const othersRes = await fetch(`/api/problems/${problemId}/reviews`, { cache: "no-store" })
       if (othersRes.ok) setOthersReviews(await othersRes.json())
 
     } catch (e) {
@@ -334,7 +335,6 @@ export default function SolvePage() {
             src={problem.pdfUrl} 
             className="w-full h-full border-none" 
             title="PDF Viewer"
-            // 🚀 핵심 수정 부분: 드래그 중일 때는 마우스 이벤트를 무시하게 만듦
             style={{ pointerEvents: isDragging ? "none" : "auto" }} 
           />
         ) : (
