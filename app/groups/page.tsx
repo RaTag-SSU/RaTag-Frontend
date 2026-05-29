@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation" // 🚀 useRouter 추가
+import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -28,7 +28,7 @@ interface Group {
 
 export default function GroupsPage() {
   const router = useRouter()
-  const [isAuthorized, setIsAuthorized] = useState(false) // 🚀 권한 확인 상태 추가
+  const [isAuthorized, setIsAuthorized] = useState(false)
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState("my")
@@ -37,21 +37,21 @@ export default function GroupsPage() {
   const [newGroupDesc, setNewGroupDesc] = useState("")
 
   useEffect(() => {
-    // 🚀 화면이 켜지자마자 권한부터 검사합니다.
     const checkAuthAndLoad = async () => {
       try {
-        const authRes = await fetch("/api/users/me")
+        // 🚀 cache: 'no-store' 추가로 캐싱 무효화
+        const authRes = await fetch("/api/users/me", { cache: "no-store" })
         if (!authRes.ok) {
           alert("로그인이 필요한 서비스입니다.")
           router.push("/login")
           return
         }
         
-        // 권한이 확인되면 화면을 열어주고 그룹 데이터를 불러옵니다.
         setIsAuthorized(true)
         loadGroups()
       } catch (e) {
-        router.push("/login")
+        // 🚀 에러 발생 시 무작정 튕기지 않고 콘솔에만 기록
+        console.error("인증 확인 중 오류:", e)
       }
     }
 
@@ -59,7 +59,8 @@ export default function GroupsPage() {
   }, [router])
 
   const loadGroups = () => {
-    fetch("/api/groups")
+    // 🚀 여기도 캐싱 무효화
+    fetch("/api/groups", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         setGroups(data)
@@ -94,7 +95,6 @@ export default function GroupsPage() {
     }
   }
 
-  // 🚀 권한을 확인하는 찰나의 순간 동안 보여줄 화면 (깜빡임 방지용)
   if (!isAuthorized) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
