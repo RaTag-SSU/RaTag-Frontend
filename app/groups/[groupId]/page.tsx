@@ -73,6 +73,7 @@ export default function GroupDetailPage() {
   const router = useRouter()
   const groupId = params.groupId as string
 
+  const [isAuthorized, setIsAuthorized] = useState(false) // 🚀 권한 확인 상태 추가
   const [group, setGroup] = useState<Group | null>(null)
   const [problems, setProblems] = useState<Problem[]>([])
   const [members, setMembers] = useState<Member[]>([])
@@ -97,16 +98,32 @@ export default function GroupDetailPage() {
   useEffect(() => {
     if (!groupId) return
 
-    fetch("/api/users/me")
-      .then((res) => (res.ok ? res.json() : { role: "ROLE_USER" }))
-      .then((user) => {
-        setIsSiteAdmin(user.role === "ROLE_ADMIN")
-        loadGroupData()
-      })
-      .catch(() => loadGroupData())
-  }, [groupId])
+    const checkAuthAndLoad = async () => {
+      try {
+        // 🚀 1. 화면이 켜지자마자 권한부터 찌릅니다.
+        const authRes = await fetch("/api/users/me")
+        if (!authRes.ok) {
+          alert("로그인이 필요한 서비스입니다.")
+          router.push("/login")
+          return
+        }
+        
+        const user = await authRes.json()
+        const isAdmin = user.role === "ROLE_ADMIN"
+        setIsSiteAdmin(isAdmin)
+        setIsAuthorized(true) // 권한 확인 완료!
+        
+        // 🚀 2. React의 비동기 상태 업데이트 문제를 해결하기 위해 isAdmin을 직접 파라미터로 넘깁니다.
+        loadGroupData(isAdmin)
+      } catch (e) {
+        router.push("/login")
+      }
+    }
 
-  const loadGroupData = () => {
+    checkAuthAndLoad()
+  }, [groupId, router])
+
+  const loadGroupData = (isAdminStatus: boolean) => {
     fetch("/api/groups")
       .then((res) => res.json())
       .then((groups: Group[]) => {
@@ -117,7 +134,7 @@ export default function GroupDetailPage() {
           return
         }
         setGroup(foundGroup)
-        if (foundGroup.role === "MEMBER" || foundGroup.role === "ADMIN" || isSiteAdmin) {
+        if (foundGroup.role === "MEMBER" || foundGroup.role === "ADMIN" || isAdminStatus) {
           loadProblems()
           loadMembers()
         }
@@ -261,6 +278,19 @@ export default function GroupDetailPage() {
     }
   }
 
+  // 🚀 1. 권한 확인 전 로딩 화면 (깜빡임 방지)
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center">
+          <p className="text-muted-foreground animate-pulse font-bold">권한을 확인하는 중입니다...</p>
+        </main>
+      </div>
+    )
+  }
+
+  // 🚀 2. 권한은 통과했으나 데이터를 불러오는 중일 때의 화면
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
