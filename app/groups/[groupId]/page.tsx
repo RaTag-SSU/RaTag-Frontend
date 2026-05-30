@@ -53,12 +53,15 @@ interface Problem {
   id: number
   title: string
   content: string
+  sourcePath?: string
   type: "SHORT_ANSWER" | "MULTIPLE_CHOICE"
   choices: string | null
   answer: string
   userStatus?: string
   topTags?: string[]
   avgDifficulty?: number | null
+  imageUrl?: string
+  pdfUrl?: string
 }
 
 interface Member {
@@ -78,6 +81,7 @@ export default function GroupDetailPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [isSiteAdmin, setIsSiteAdmin] = useState(false)
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [mode, setMode] = useState<"CREATE" | "UPDATE">("CREATE")
   const [editingProblem, setEditingProblem] = useState<Problem | null>(null)
@@ -85,21 +89,29 @@ export default function GroupDetailPage() {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list")
   const [expandedTags, setExpandedTags] = useState<Set<number>>(new Set())
 
+  // 🚀 공개 문제 페이지와 동일하게 폼 데이터 확장
   const [formData, setFormData] = useState({
     title: "",
+    sourcePath: "",
     content: "",
     type: "SHORT_ANSWER",
-    choices: "",
+    choices: ["", "", "", "", ""],
     answer: "",
+    uploadMode: "BLOG",
+    pdfType: "FILE",
+    pdfUrl: "",
   })
+  
+  // 🚀 파일 업로드용 상태 추가
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [pdfFile, setPdfFile] = useState<File | null>(null)
 
   useEffect(() => {
     if (!groupId) return
 
     const checkAuthAndLoad = async () => {
       try {
-        // 🚀 캐싱 방지 옵션 추가
-        const authRes = await fetch("/api/users/me", { cache: "no-store" })
+        const authRes = await fetch("/api/users/me", { cache: "no-store", credentials: "include" })
         if (!authRes.ok) {
           alert("로그인이 필요한 서비스입니다.")
           window.location.href = "/login?new=1"
@@ -121,7 +133,7 @@ export default function GroupDetailPage() {
   }, [groupId, router])
 
   const loadGroupData = (isAdminStatus: boolean) => {
-    fetch("/api/groups", { cache: "no-store" }) // 🚀 캐싱 방지
+    fetch("/api/groups", { cache: "no-store", credentials: "include" })
       .then((res) => res.json())
       .then((groups: Group[]) => {
         const foundGroup = groups.find((g) => g.id === Number(groupId))
@@ -149,7 +161,8 @@ export default function GroupDetailPage() {
           page: 0,
           size: 100
         }),
-        cache: "no-store" // 🚀 캐싱 방지
+        cache: "no-store",
+        credentials: "include"
       })
       if (res.ok) {
         const data = await res.json()
@@ -161,7 +174,7 @@ export default function GroupDetailPage() {
   }
 
   const loadMembers = () => {
-    fetch(`/api/groups/${groupId}/members`, { cache: "no-store" }) // 🚀 캐싱 방지
+    fetch(`/api/groups/${groupId}/members`, { cache: "no-store", credentials: "include" })
       .then((res) => res.json())
       .then((data) => setMembers(data))
   }
@@ -175,97 +188,111 @@ export default function GroupDetailPage() {
     })
   }
 
+  // 🚀 공개 문제 폼 로직 이식
   const openCreateForm = () => {
     setMode("CREATE")
     setEditingProblem(null)
-    setFormData({ title: "", content: "", type: "SHORT_ANSWER", choices: "", answer: "" })
-    setIsDialogOpen(true)
-  }
-
-  const openUpdateForm = async (problemId: number) => {
-    const res = await fetch(`/api/problems/${problemId}`, { cache: "no-store" })
-    const problem = await res.json()
-    setMode("UPDATE")
-    setEditingProblem(problem)
-    setFormData({
-      title: problem.title || "",
-      content: problem.content || "",
-      type: problem.type || "SHORT_ANSWER",
-      choices: problem.choices || "",
-      answer: problem.answer || "",
+    setFormData({ 
+      title: "", sourcePath: "", content: "", type: "SHORT_ANSWER", 
+      choices: ["", "", "", "", ""], answer: "", uploadMode: "BLOG", pdfType: "FILE", pdfUrl: "" 
     })
+    setImageFile(null)
+    setPdfFile(null)
     setIsDialogOpen(true)
   }
 
+  // 🚀 공개 문제 폼 로직 이식 (기존 데이터 불러오기)
+  const openUpdateForm = async (problemId: number) => {
+    const res = await fetch(`/api/problems/${problemId}`, { cache: "no-store", credentials: "include" })
+    const p = await res.json()
+    setMode("UPDATE")
+    setEditingProblem(p)
+    
+    let parsedChoices = ["", "", "", "", ""]
+    try {
+      if (p.choices) parsedChoices = JSON.parse(p.choices)
+    } catch (e) {}
+
+    setFormData({
+      title: p.title || "",
+      sourcePath: p.sourcePath || "",
+      content: p.content || "",
+      type: p.type || "SHORT_ANSWER",
+      choices: parsedChoices,
+      answer: p.answer || "",
+      uploadMode: p.pdfUrl ? "PDF" : "BLOG",
+      pdfType: p.pdfUrl && p.pdfUrl.startsWith("http") ? "URL" : "FILE",
+      pdfUrl: p.pdfUrl && p.pdfUrl.startsWith("http") ? p.pdfUrl : "",
+    })
+    setImageFile(null)
+    setPdfFile(null)
+    setIsDialogOpen(true)
+  }
+
+  const updateChoice = (index: number, value: string) => {
+    const newChoices = [...formData.choices]
+    newChoices[index] = value
+    setFormData({ ...formData, choices: newChoices })
+  }
+
+  // 🚀 JSON 제출에서 FormData 제출(파일 포함)로 이식
   const handleSubmit = async () => {
     if (!formData.title || !formData.answer) {
       alert("제목과 정답은 필수입니다!")
       return
     }
 
-    if (mode === "CREATE") {
-      const formDataObj = new FormData()
-      formDataObj.append("title", formData.title)
-      formDataObj.append("type", formData.type)
-      formDataObj.append("answer", formData.answer)
-      if (formData.content) formDataObj.append("content", formData.content)
-      if (formData.type === "MULTIPLE_CHOICE" && formData.choices) {
-        formDataObj.append("choices", formData.choices)
-      }
+    const fd = new FormData()
+    fd.append("uploadMode", formData.uploadMode)
+    fd.append("title", formData.title)
+    fd.append("sourcePath", formData.sourcePath)
+    fd.append("type", formData.type)
+    fd.append("answer", formData.answer)
 
-      const res = await fetch(`/api/problems?groupId=${groupId}`, {
-        method: "POST",
-        body: formDataObj,
-      })
-
-      if (res.ok) {
-        alert("완료!")
-        setIsDialogOpen(false)
-        loadProblems()
-      } else {
-        const msg = await res.text()
-        alert(msg)
-      }
+    if (formData.uploadMode === "BLOG") {
+      fd.append("content", formData.content)
+      if (imageFile) fd.append("imageFile", imageFile)
     } else {
-      const res = await fetch(`/api/problems/${editingProblem?.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: formData.title,
-          content: formData.content,
-          type: formData.type,
-          choices: formData.type === "MULTIPLE_CHOICE" ? formData.choices : null,
-          answer: formData.answer,
-        }),
-      })
-
-      if (res.ok) {
-        alert("수정 완료!")
-        setIsDialogOpen(false)
-        loadProblems()
+      if (formData.pdfType === "FILE" && pdfFile) {
+        fd.append("pdfFile", pdfFile)
       } else {
-        const msg = await res.text()
-        alert(msg)
+        fd.append("pdfUrl", formData.pdfUrl)
       }
+    }
+
+    if (formData.type === "MULTIPLE_CHOICE") {
+      fd.append("choices", JSON.stringify(formData.choices))
+    }
+
+    const url = mode === "CREATE" ? `/api/problems?groupId=${groupId}` : `/api/problems/${editingProblem?.id}`
+    const res = await fetch(url, { method: "POST", body: fd, credentials: "include" })
+
+    if (res.ok) {
+      alert("저장되었습니다.")
+      setIsDialogOpen(false)
+      loadProblems()
+    } else {
+      const msg = await res.text()
+      alert("저장 실패: " + msg)
     }
   }
 
   const deleteProblem = async (id: number) => {
-    if (!confirm("삭제하시겠습니까?")) return
-    const res = await fetch(`/api/problems/${id}`, { method: "DELETE" })
+    if (!confirm("정말 삭제하시겠습니까? 관련 데이터가 모두 삭제됩니다.")) return
+    const res = await fetch(`/api/problems/${id}`, { method: "DELETE", credentials: "include" })
     if (res.ok) loadProblems()
     else alert("삭제 실패")
   }
 
   const manageMember = async (userId: number, action: "approve" | "kick") => {
-    const res = await fetch(`/api/groups/${groupId}/${action}/${userId}`, { method: "POST" })
+    const res = await fetch(`/api/groups/${groupId}/${action}/${userId}`, { method: "POST", credentials: "include" })
     if (res.ok) loadMembers()
     else alert("처리 실패")
   }
 
   const leaveGroup = async () => {
     if (!confirm("정말 이 그룹에서 탈퇴하시겠습니까?")) return
-    const res = await fetch(`/api/groups/${groupId}/leave`, { method: "DELETE" })
+    const res = await fetch(`/api/groups/${groupId}/leave`, { method: "DELETE", credentials: "include" })
     if (res.ok) {
       alert("그룹에서 정상적으로 탈퇴했습니다.")
       router.push("/groups")
@@ -511,79 +538,146 @@ export default function GroupDetailPage() {
                 </div>
               )}
 
+              {/* 🚀 공개 문제와 동일한 폼 구조 */}
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="bg-card border-border max-w-lg max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>{mode === "CREATE" ? "새 문제 등록" : "문제 수정"}</DialogTitle>
+                    <DialogTitle>{mode === "CREATE" ? "문제 등록" : "문제 수정"}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label>제목 *</Label>
-                      <Input
-                        value={formData.title}
-                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                        placeholder="문제 제목"
-                        className="bg-input border-border"
-                      />
+                    <div className="flex gap-2 p-1 bg-secondary rounded-lg">
+                      <Button 
+                        variant={formData.uploadMode === "BLOG" ? "default" : "ghost"} 
+                        className="flex-1" 
+                        onClick={() => setFormData({...formData, uploadMode: "BLOG"})}
+                      >📝 블로그형</Button>
+                      <Button 
+                        variant={formData.uploadMode === "PDF" ? "default" : "ghost"} 
+                        className="flex-1"
+                        onClick={() => setFormData({...formData, uploadMode: "PDF"})}
+                      >📄 PDF형</Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label>내용</Label>
-                      <Textarea
-                        value={formData.content}
-                        onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                        placeholder="문제 내용"
-                        className="bg-input border-border min-h-[100px]"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>유형 *</Label>
-                      <Select
-                        value={formData.type}
-                        onValueChange={(value) => setFormData({ ...formData, type: value })}
-                      >
-                        <SelectTrigger className="bg-input border-border">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border">
-                          <SelectItem value="SHORT_ANSWER">주관식</SelectItem>
-                          <SelectItem value="MULTIPLE_CHOICE">객관식</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {formData.type === "MULTIPLE_CHOICE" && (
+
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>보기 (JSON 배열 형식)</Label>
+                        <Label>제목 *</Label>
                         <Input
-                          value={formData.choices}
-                          onChange={(e) => setFormData({ ...formData, choices: e.target.value })}
-                          placeholder='["1번", "2번", "3번", "4번", "5번"]'
-                          className="bg-input border-border"
+                          value={formData.title}
+                          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                          placeholder="제목을 입력하세요"
+                          className="bg-input"
                         />
                       </div>
-                    )}
-                    <div className="space-y-2">
-                      <Label>정답 *</Label>
-                      <Input
-                        value={formData.answer}
-                        onChange={(e) => setFormData({ ...formData, answer: e.target.value })}
-                        placeholder="정답"
-                        className="bg-input border-border"
-                      />
+                      <div className="space-y-2">
+                        <Label>경로/출처 (선택)</Label>
+                        <Input
+                          value={formData.sourcePath}
+                          onChange={(e) => setFormData({ ...formData, sourcePath: e.target.value })}
+                          placeholder="예: 2024학년도 수능"
+                          className="bg-input"
+                        />
+                      </div>
                     </div>
+
+                    {formData.uploadMode === "BLOG" ? (
+                      <>
+                        <div className="space-y-2">
+                          <Label>이미지 첨부</Label>
+                          <Input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                            className="bg-input cursor-pointer" 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>본문 내용 *</Label>
+                          <Textarea
+                            value={formData.content}
+                            onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                            placeholder="지문을 입력하세요..."
+                            className="bg-input min-h-[150px]"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="p-4 bg-secondary/50 rounded-lg space-y-4">
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="pdfType" checked={formData.pdfType === "FILE"} onChange={() => setFormData({...formData, pdfType: "FILE"})} />
+                            <span className="text-sm">파일 업로드</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="pdfType" checked={formData.pdfType === "URL"} onChange={() => setFormData({...formData, pdfType: "URL"})} />
+                            <span className="text-sm">외부 URL</span>
+                          </label>
+                        </div>
+                        {formData.pdfType === "FILE" ? (
+                           <Input type="file" accept="application/pdf" onChange={(e) => setPdfFile(e.target.files?.[0] || null)} className="bg-input cursor-pointer" />
+                        ) : (
+                           <Input value={formData.pdfUrl} onChange={(e) => setFormData({...formData, pdfUrl: e.target.value})} placeholder="https://..." className="bg-input" />
+                        )}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>유형 *</Label>
+                        <Select
+                          value={formData.type}
+                          onValueChange={(value: "SHORT_ANSWER" | "MULTIPLE_CHOICE") => setFormData({ ...formData, type: value })}
+                        >
+                          <SelectTrigger className="bg-input">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="SHORT_ANSWER">주관식</SelectItem>
+                            <SelectItem value="MULTIPLE_CHOICE">객관식</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>정답 *</Label>
+                        {formData.type === "MULTIPLE_CHOICE" ? (
+                          <Select value={formData.answer} onValueChange={(val) => setFormData({...formData, answer: val})}>
+                            <SelectTrigger className="bg-input"><SelectValue placeholder="정답 선택" /></SelectTrigger>
+                            <SelectContent>
+                              {[1,2,3,4,5].map(num => (
+                                <SelectItem key={num} value={num.toString()}>{num}번</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            value={formData.answer}
+                            onChange={(e) => setFormData({ ...formData, answer: e.target.value })}
+                            placeholder="정답"
+                            className="bg-input"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {formData.type === "MULTIPLE_CHOICE" && (
+                      <div className="space-y-3 p-4 border rounded-lg bg-secondary/20">
+                        <Label>보기 항목</Label>
+                        {formData.choices.map((choice, i) => (
+                          <div key={i} className="flex items-center gap-3">
+                            <span className="font-bold text-primary w-6 text-center">{i+1}</span>
+                            <Input
+                              value={choice}
+                              onChange={(e) => updateChoice(i, e.target.value)}
+                              placeholder={`${i+1}번 보기 내용`}
+                              className="bg-input"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
                     <div className="flex gap-3 pt-4">
-                      <Button
-                        onClick={handleSubmit}
-                        className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                      >
-                        저장
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsDialogOpen(false)}
-                        className="flex-1 border-border"
-                      >
-                        취소
-                      </Button>
+                      <Button onClick={handleSubmit} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90">저장하기</Button>
+                      <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="flex-1">취소</Button>
                     </div>
                   </div>
                 </DialogContent>
