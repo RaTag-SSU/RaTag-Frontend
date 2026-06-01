@@ -23,6 +23,7 @@ import {
   Trophy, BookOpen, CheckCircle2, XCircle, Trash2 
 } from "lucide-react"
 import Link from "next/link"
+import { apiFetch } from "@/lib/api"
 
 interface UserStats {
   accuracy: number 
@@ -63,31 +64,17 @@ export default function MyPage() {
 
   const fetchUserData = async () => {
     try {
-      // 🚀 데이터 요청마다 { cache: "no-store" } 추가
-      const res = await fetch("/api/users/me", { cache: "no-store" })
-      
-      if (!res.ok) {
-        alert("로그인이 필요한 서비스입니다.")
-        window.location.href = "/login?new=1"
-        return 
-      }
-      
+      const res = await apiFetch("/api/users/me")
       const userData = await res.json()
       setUser(userData)
       setNickname(userData.nickname || userData.name || "")
 
-      // 🚀 여기도 통계 캐싱 방지
-      const statsRes = await fetch("/api/users/stats", { cache: "no-store" })
-      if (statsRes.ok) {
-        const statsData = await statsRes.json()
-        setStats(statsData)
-      }
-      
-      setIsLoading(false) 
-
+      const statsRes = await apiFetch("/api/users/stats")
+      setStats(await statsRes.json())
     } catch (e) {
       console.error(e)
-      window.location.href = "/login?new=1"
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -110,7 +97,7 @@ export default function MyPage() {
     if (newPassword) payload.newPassword = newPassword
 
     try {
-      const res = await fetch("/api/users/me", {
+      const res = await apiFetch("/api/users/me", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -138,7 +125,7 @@ export default function MyPage() {
     }
 
     try {
-      const res = await fetch("/api/users/me", {
+      const res = await apiFetch("/api/users/me", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword: withdrawPassword }),

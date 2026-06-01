@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Navbar } from "@/components/navbar"
+import { apiFetch } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -27,8 +27,6 @@ interface Group {
 }
 
 export default function GroupsPage() {
-  const router = useRouter()
-  const [isAuthorized, setIsAuthorized] = useState(false)
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState("my")
@@ -37,47 +35,23 @@ export default function GroupsPage() {
   const [newGroupDesc, setNewGroupDesc] = useState("")
 
   useEffect(() => {
-    const checkAuthAndLoad = async () => {
-      try {
-        // 🚀 핵심: URL 뒤에 ?t=시간값을 붙여서 브라우저 캐시를 강제로 무력화합니다!
-        const authRes = await fetch(`/api/users/me?t=${Date.now()}`, { cache: "no-store" })
-        
-        if (!authRes.ok) {
-          alert("로그인이 만료되었거나 권한이 없습니다.") // 이 알림이 떠야 정상 적용된 것입니다.
-          window.location.href = "/login?new=1"
-          return
-        }
-        
-        setIsAuthorized(true)
-        loadGroups()
-      } catch (e) {
-        console.error("인증 오류:", e)
-      }
+    loadGroups()
+  }, [])
+
+  const loadGroups = async () => {
+    try {
+      const res = await apiFetch("/api/groups")
+      setGroups(await res.json())
+    } catch (e) {
+      console.error("그룹 로드 에러:", e)
+    } finally {
+      setLoading(false)
     }
-
-    checkAuthAndLoad()
-  }, [router])
-
-  const loadGroups = () => {
-    // 🚀 여기도 타임스탬프를 붙여 무조건 최신 그룹 목록을 가져오게 합니다.
-    fetch(`/api/groups?t=${Date.now()}`, { cache: "no-store" })
-      .then((res) => {
-        if (!res.ok) throw new Error("그룹 데이터를 불러오지 못했습니다.")
-        return res.json()
-      })
-      .then((data) => {
-        setGroups(data)
-        setLoading(false)
-      })
-      .catch((err) => {
-        console.error("그룹 로드 에러:", err)
-        setLoading(false)
-      })
   }
 
   const createGroup = async () => {
     if (!newGroupName) return
-    const res = await fetch("/api/groups", {
+    const res = await apiFetch("/api/groups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newGroupName, description: newGroupDesc }),
@@ -91,22 +65,11 @@ export default function GroupsPage() {
   }
 
   const joinGroup = async (id: number) => {
-    const res = await fetch(`/api/groups/${id}/join`, { method: "POST" })
+    const res = await apiFetch(`/api/groups/${id}/join`, { method: "POST" })
     if (res.ok) {
       alert("가입 신청이 완료되었습니다.")
       loadGroups()
     }
-  }
-
-  if (!isAuthorized) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <Navbar />
-        <main className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground animate-pulse font-bold">권한을 확인하는 중입니다...</p>
-        </main>
-      </div>
-    )
   }
 
   const myGroups = groups.filter((g) => g.role !== "NONE")
