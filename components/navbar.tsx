@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/lib/auth-context"
 import { BookOpen, Users, Globe, User, LogIn, LogOut, Tag, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -17,38 +17,7 @@ const navItems = [
 
 export function Navbar() {
   const pathname = usePathname()
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    fetch("/api/users/me", { cache: "no-store" })
-      .then((res) => {
-        setIsLoggedIn(res.ok)
-        setIsLoading(false)
-      })
-      .catch(() => {
-        setIsLoggedIn(false)
-        setIsLoading(false)
-      })
-  }, [])
-
-  // 🚀 요청하신 완벽한 로그아웃 로직으로 교체!
-  const handleLogout = async () => {
-    setIsLoading(true) // 버튼 연타 방지
-    try {
-      // 1. 백엔드에 명시적으로 세션 파기 요청
-      await fetch("/api/users/logout", { method: "POST", cache: "no-store" })
-      
-      // 2. 브라우저에 남아있을 수 있는 쿠키 찌꺼기 강제 삭제
-      document.cookie = "JSESSIONID=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      document.cookie = "SESSION=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    } catch (e) {
-      console.error("로그아웃 오류:", e)
-    } finally {
-      // 3. Vercel의 캐시를 뚫고 강제로 새로고침하며 초기화
-      window.location.href = "/?logout=clear"
-    }
-  }
+  const { isLoggedIn, isLoading, logout } = useAuth()
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -105,7 +74,7 @@ export function Navbar() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleLogout}
+                onClick={logout}
                 className="gap-2 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50"
               >
                 <LogOut className="h-4 w-4" />
