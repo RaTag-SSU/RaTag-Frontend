@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Navbar } from "@/components/navbar"
+import { apiFetch } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -109,31 +110,24 @@ export default function GroupDetailPage() {
   useEffect(() => {
     if (!groupId) return
 
-    const checkAuthAndLoad = async () => {
+    const load = async () => {
       try {
-        const authRes = await fetch("/api/users/me", { cache: "no-store", credentials: "include" })
-        if (!authRes.ok) {
-          alert("로그인이 필요한 서비스입니다.")
-          window.location.href = "/login?new=1"
-          return
-        }
-        
+        const authRes = await apiFetch("/api/users/me")
         const user = await authRes.json()
         const isAdmin = user.role === "ROLE_ADMIN"
         setIsSiteAdmin(isAdmin)
-        setIsAuthorized(true) 
-        
+        setIsAuthorized(true)
         loadGroupData(isAdmin)
       } catch (e) {
-        console.error("인증 확인 에러:", e)
+        console.error("초기화 에러:", e)
       }
     }
 
-    checkAuthAndLoad()
+    load()
   }, [groupId, router])
 
   const loadGroupData = (isAdminStatus: boolean) => {
-    fetch("/api/groups", { cache: "no-store", credentials: "include" })
+    apiFetch("/api/groups")
       .then((res) => res.json())
       .then((groups: Group[]) => {
         const foundGroup = groups.find((g) => g.id === Number(groupId))
@@ -153,7 +147,7 @@ export default function GroupDetailPage() {
 
   const loadProblems = async () => {
     try {
-      const res = await fetch("/api/problems/search", {
+      const res = await apiFetch("/api/problems/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -174,7 +168,7 @@ export default function GroupDetailPage() {
   }
 
   const loadMembers = () => {
-    fetch(`/api/groups/${groupId}/members`, { cache: "no-store", credentials: "include" })
+    apiFetch(`/api/groups/${groupId}/members`)
       .then((res) => res.json())
       .then((data) => setMembers(data))
   }
@@ -203,7 +197,7 @@ export default function GroupDetailPage() {
 
   // 🚀 공개 문제 폼 로직 이식 (기존 데이터 불러오기)
   const openUpdateForm = async (problemId: number) => {
-    const res = await fetch(`/api/problems/${problemId}`, { cache: "no-store", credentials: "include" })
+    const res = await apiFetch(`/api/problems/${problemId}`, { cache: "no-store", credentials: "include" })
     const p = await res.json()
     setMode("UPDATE")
     setEditingProblem(p)
@@ -265,7 +259,7 @@ export default function GroupDetailPage() {
     }
 
     const url = mode === "CREATE" ? `/api/problems?groupId=${groupId}` : `/api/problems/${editingProblem?.id}`
-    const res = await fetch(url, { method: "POST", body: fd, credentials: "include" })
+    const res = await apiFetch(url, { method: "POST", body: fd, credentials: "include" })
 
     if (res.ok) {
       alert("저장되었습니다.")
@@ -279,20 +273,20 @@ export default function GroupDetailPage() {
 
   const deleteProblem = async (id: number) => {
     if (!confirm("정말 삭제하시겠습니까? 관련 데이터가 모두 삭제됩니다.")) return
-    const res = await fetch(`/api/problems/${id}`, { method: "DELETE", credentials: "include" })
+    const res = await apiFetch(`/api/problems/${id}`, { method: "DELETE", credentials: "include" })
     if (res.ok) loadProblems()
     else alert("삭제 실패")
   }
 
   const manageMember = async (userId: number, action: "approve" | "kick") => {
-    const res = await fetch(`/api/groups/${groupId}/${action}/${userId}`, { method: "POST", credentials: "include" })
+    const res = await apiFetch(`/api/groups/${groupId}/${action}/${userId}`, { method: "POST", credentials: "include" })
     if (res.ok) loadMembers()
     else alert("처리 실패")
   }
 
   const leaveGroup = async () => {
     if (!confirm("정말 이 그룹에서 탈퇴하시겠습니까?")) return
-    const res = await fetch(`/api/groups/${groupId}/leave`, { method: "DELETE", credentials: "include" })
+    const res = await apiFetch(`/api/groups/${groupId}/leave`, { method: "DELETE", credentials: "include" })
     if (res.ok) {
       alert("그룹에서 정상적으로 탈퇴했습니다.")
       router.push("/groups")

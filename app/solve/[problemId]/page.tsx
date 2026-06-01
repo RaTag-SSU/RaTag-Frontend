@@ -14,6 +14,7 @@ import {
   ArrowLeft, BookOpen, CheckCircle2, Send, FileText, Image as ImageIcon,
   MessageSquare, X, Pencil, Trash2
 } from "lucide-react"
+import { apiFetch } from "@/lib/api"
 
 interface Problem {
   id: number
@@ -88,16 +89,9 @@ export default function SolvePage() {
 
     const initData = async () => {
       try {
-        const authRes = await fetch("/api/users/me", { cache: "no-store" })
-        if (!authRes.ok) {
-          alert("로그인이 필요한 서비스입니다.")
-          window.location.href = "/login?new=1"
-          return 
-        }
-
         const [pRes, sRes] = await Promise.all([
-          fetch(`/api/problems/${problemId}`, { cache: "no-store" }),
-          fetch(`/api/submissions/status/${problemId}`, { cache: "no-store" })
+          apiFetch(`/api/problems/${problemId}`),
+          apiFetch(`/api/submissions/status/${problemId}`)
         ])
 
         if (pRes.ok) setProblem(await pRes.json())
@@ -162,7 +156,7 @@ export default function SolvePage() {
     }
 
     try {
-      const res = await fetch("/api/submissions", {
+      const res = await apiFetch("/api/submissions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ problemId, answer: userAnswer }),
@@ -193,10 +187,10 @@ export default function SolvePage() {
   // 리뷰 대시보드 로드
   const loadReviewDashboard = async () => {
     try {
-      const sumRes = await fetch(`/api/problems/${problemId}/reviews/summary`, { cache: "no-store" })
+      const sumRes = await apiFetch(`/api/problems/${problemId}/reviews/summary`, { cache: "no-store" })
       if (sumRes.ok) setSummary(await sumRes.json())
 
-      const meRes = await fetch(`/api/problems/${problemId}/reviews/me`, { cache: "no-store" })
+      const meRes = await apiFetch(`/api/problems/${problemId}/reviews/me`, { cache: "no-store" })
       if (meRes.ok && meRes.status !== 204) {
         const myData: Review = await meRes.json()
         setMyReview(myData)
@@ -211,7 +205,7 @@ export default function SolvePage() {
         setIsEditing(true) 
       }
 
-      const othersRes = await fetch(`/api/problems/${problemId}/reviews`, { cache: "no-store" })
+      const othersRes = await apiFetch(`/api/problems/${problemId}/reviews`, { cache: "no-store" })
       if (othersRes.ok) setOthersReviews(await othersRes.json())
 
     } catch (e) {
@@ -223,7 +217,7 @@ export default function SolvePage() {
   const saveEvaluation = async () => {
     const totalSeconds = (Number(reviewMin) || 0) * 60 + (Number(reviewSec) || 0)
     try {
-      const res = await fetch("/api/submissions/review", {
+      const res = await apiFetch("/api/submissions/review", {
         method: myReview ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -249,7 +243,7 @@ export default function SolvePage() {
   const deleteEvaluation = async () => {
     if (!confirm("정말 이 평가를 삭제하시겠습니까?")) return
     try {
-      await fetch(`/api/submissions/review?problemId=${problemId}`, { method: "DELETE" })
+      await apiFetch(`/api/submissions/review?problemId=${problemId}`, { method: "DELETE" })
       alert("삭제되었습니다.")
       window.location.reload()
     } catch (e) {
@@ -265,7 +259,7 @@ export default function SolvePage() {
       return
     }
     try {
-      const res = await fetch(`/api/tags/search?query=${encodeURIComponent(query)}`)
+      const res = await apiFetch(`/api/tags/search?query=${encodeURIComponent(query)}`)
       setTagSuggestions(await res.json())
     } catch (e) {
       console.error(e)
