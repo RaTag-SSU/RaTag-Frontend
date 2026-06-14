@@ -14,7 +14,7 @@ import {
   ArrowLeft, BookOpen, CheckCircle2, Send, FileText, Image as ImageIcon,
   MessageSquare, X, Pencil, Trash2
 } from "lucide-react"
-import { apiFetch } from "@/lib/api"
+import { apiFetch, parseErrorMessage } from "@/lib/api"
 
 interface Problem {
   id: number
@@ -94,8 +94,14 @@ export default function SolvePage() {
           apiFetch(`/api/submissions/status/${problemId}`)
         ])
 
-        if (pRes.ok) setProblem(await pRes.json())
-        
+        if (pRes.ok) {
+          setProblem(await pRes.json())
+        } else if (pRes.status === 403) {
+          alert("접근 권한이 없습니다. 그룹 멤버만 풀 수 있는 문제입니다.")
+          router.push("/groups")
+          return
+        }
+
         if (sRes.ok) {
           const sData = await sRes.json()
           setFailCount(sData.failCount || 0)
@@ -229,7 +235,7 @@ export default function SolvePage() {
         })
       })
       if (!res.ok) {
-        const err = await res.text()
+        const err = await parseErrorMessage(res)
         alert("❌ 평가 저장 실패: " + err)
         return
       }
