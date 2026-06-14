@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Navbar } from "@/components/navbar"
-import { apiFetch } from "@/lib/api"
+import { apiFetch, parseErrorMessage } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -167,10 +167,9 @@ export default function GroupDetailPage() {
     }
   }
 
-  const loadMembers = () => {
-    apiFetch(`/api/groups/${groupId}/members`)
-      .then((res) => res.json())
-      .then((data) => setMembers(data))
+  const loadMembers = async () => {
+    const res = await apiFetch(`/api/groups/${groupId}/members`)
+    if (res.ok) setMembers(await res.json())
   }
 
   const toggleTags = (id: number) => {
@@ -266,7 +265,7 @@ export default function GroupDetailPage() {
       setIsDialogOpen(false)
       loadProblems()
     } else {
-      const msg = await res.text()
+      const msg = await parseErrorMessage(res)
       alert("저장 실패: " + msg)
     }
   }
@@ -291,7 +290,7 @@ export default function GroupDetailPage() {
       alert("그룹에서 정상적으로 탈퇴했습니다.")
       router.push("/groups")
     } else {
-      const msg = await res.text()
+      const msg = await parseErrorMessage(res)
       alert("탈퇴 실패: " + msg)
     }
   }
